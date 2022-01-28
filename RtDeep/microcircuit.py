@@ -42,7 +42,6 @@ class model:
 		self.layers = layers
 		self.uP = copy.deepcopy(uP_init)
 		self.uI = copy.deepcopy(uI_init)
-		self.utgt = [np.zeros_like(uI_init[0])]
 		# we also set up a buffer of voltages,
 		# which corresponds to the value at the last time step
 		self.uP_old = copy.deepcopy(self.uP)
@@ -77,7 +76,7 @@ class model:
 		self.dt = dt
 		self.tauxi = tauxi
 		self.Tpres = Tpres
-		self.taueffP, self.taueffI = self.calc_taueff()
+		self.taueffP, self.taueffP_notgt, self.taueffI = self.calc_taueff()
 
 		# learning rates
 		self.eta_fw = eta_fw
@@ -93,10 +92,12 @@ class model:
 		for i in self.uP:
 			taueffP.append(1 / (self.gl + self.gbas + self.gapi))
 		taueffP[-1] = 1 / (self.gl + self.gbas + self.gntgt)
+		# tau_eff for output layer in absence of target
+		taueffP_notgt = [1 / (self.gl + self.gbas)]
 
 		taueffI = [1 / (self.gl + self.gden + self.gnI)]
 
-		return taueffP, taueffI
+		return taueffP, taueffP_notgt, taueffI
 
 
 	def get_conductances(self):
@@ -164,7 +165,7 @@ class model:
 		return uvec_old + tau * (uvec - uvec_old) / self.dt
 
 
-	def evolve_system(self, r0=None):
+	def evolve_system(self, r0=None, u_tgt=None):
 
 		""" evolves the system by one time step:
 			updates synaptic weights and voltages
@@ -173,11 +174,11 @@ class model:
 
 		self.Time += self.dt
 
-		self.evolve_voltages(r0) # includes recalc of rP_breve
+		self.evolve_voltages(r0, u_tgt) # includes recalc of rP_breve
 		self.evolve_synapses(r0)
 
 
-	def evolve_voltages(self, r0=None):
+	def evolve_voltages(self, r0=None, u_tgt=None):
 		""" Evolves the pyramidal and interneuron voltages by one dt """
 		""" using r0 as input rates """
 
@@ -187,7 +188,7 @@ class model:
 		self.uI_breve = [self.prospective_voltage(self.uI[i], self.uI_old[i], self.taueffI[i]) for i in range(len(self.uI))]
 		# calculate rate of lookahead: phi(ubreve)
 		self.rP_breve = [self.activation[i](self.uP_breve[i]) for i in range(len(self.uP_breve))]
-		self.rI_breve = [self.activation[i](self.uI_breve[i]) for i in range(len(self.uI_breve))]
+		self.rI_breve = [self.activation[-1](self.uI_breve[-1])]
 
 		# before modifying uP and uI, we need to save copy
 		# for future calculation of u_breve
@@ -207,23 +208,21 @@ class model:
 			self.vapi[i] = self.calc_vapi(self.rP_breve[-1], self.BPP[i], self.rI_breve[-1], self.BPI[i])
 
 		# update somatic potentials
-		ueffI = self.taueffI[-1] * (self.gden * self.vden[-1] + self.gnI * self.uP[-1])
+		ueffI = self.taueffI[-1] * (self.gden * self.vden[-1] + self.gnI * self.uP_breve[-1])
 		delta_uI = (ueffI - self.uI[-1]) / self.taueffI[-1]
-		# delta_uI = - self.gl * self.uI[-1] + self.gden * (self.vden[-1] - self.uI[-1])
-		# delta_uI = self.gnI * (self.uP[-1] - self.uI[-1])
 		self.uI[-1] += self.dt * delta_uI
 
 		for i in range(0, len(self.layers)-2):
 			ueffP = self.taueffP[i] * (self.gbas * self.vbas[i] + self.gapi * self.vapi[i])
 			delta_uP = (ueffP - self.uP[i]) / self.taueffP[i]
-			# delta_uP = - self.gl * self.uP[i] + self.gbas * (self.vbas[i] - self.uP[i])
-			# delta_uP += self.gapi * (self.vapi[i] - self.uP[i])
 			self.uP[i] += self.dt * delta_uP
 
-		ueffP = self.taueffP[-1] * (self.gbas * self.vbas[-1] + self.gntgt * self.utgt[-1])
-		# delta_uP = - self.gl * self.uP[-1] + self.gbas * (self.vbas[-1] - self.uP[-1])
-		# delta_uP += self.gntgt * (self.utgt[-1] - self.uP[-1])
-		delta_uP = (ueffP - self.uP[-1]) / self.taueffP[-1]
+		if u_tgt is not None:
+			ueffP = self.taueffP[-1] * (self.gbas * self.vbas[-1] + self.gntgt * self.utgt[-1])
+			delta_uP = (ueffP - self.uP[-1]) / self.taueffP[-1]
+		else:
+			ueffP = self.taueffP_notgt[-1] * (self.gbas * self.vbas[-1])
+			delta_uP = (ueffP - self.uP[-1]) / self.taueffP[-1]
 		self.uP[-1] += self.dt * delta_uP
 
 
@@ -249,7 +248,7 @@ class model:
 													self.rP_breve[i-1])
 		# output layer
 		self.WPP[-1] += self.eta_fw[-1] * np.outer(
-					self.dt * self.uP_breve[-1] - self.activation[-1](self.gbas / (self.gl + self.gbas) * self.vbas[-1]),
+					self.uP_breve[-1] - self.activation[-1](self.gbas / (self.gl + self.gbas) * self.vbas[-1]),
 													self.rP_breve[-2])
 
 		"""
