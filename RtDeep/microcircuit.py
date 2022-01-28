@@ -108,10 +108,10 @@ class model:
 
 
 	def set_weights(self, WPP=None, WIP=None, BPP=None, BPI=None):
-		if WPP != None: self.WPP = WPP
-		if WIP != None: self.WIP = WIP
-		if BPP != None: self.BPP = BPP
-		if BPI != None: self.BPI = BPI
+		if WPP is not None: self.WPP = WPP
+		if WIP is not None: self.WIP = WIP
+		if BPP is not None: self.BPP = BPP
+		if BPI is not None: self.BPI = BPI
 
 
 	def set_self_predicting_state(self):
@@ -127,37 +127,34 @@ class model:
 
 	def set_voltages(self, uP=None, uI=None):
 
-		if uP != None:
+		if uP is not None:
 			for i in range(len(self.layers)-1):
 				print(i)
 				self.uP[i] = uP[i]
 
-		if uI != None:
+		if uI is not None:
 			self.uI = uI
 
 	def calc_vapi(self, rPvec, BPP_mat, rIvec, BPI_mat):
 		# returns apical voltages in pyramidals of a given layer
-		# input: uPvec: vector of pyramidal voltages in output layer
+		# input: rPvec: vector of rates from pyramidal voltages in output layer
 		# 		 WPP_mat: matrix connecting pyramidal to pyramidal
-		# 		 uIvec: vector of interneuron voltages in output layer
+		# 		 rIvec: vector of rates from interneuron voltages in output layer
 		# 		 BPI_mat: matrix connecting interneurons to pyramidals
-		#		 activation: activation function of pyramidal and interneuron @ output layer
 
 		return BPP_mat @ rPvec + BPI_mat @ rIvec
 
 	def calc_vbas(self, rPvec, WPP_mat):
 		# returns basal voltages in pyramidals of a given layer
-		# input: uPvec: vector of pyramidal voltages in layer below
+		# input: rPvec: vector of rates from pyramidal voltages in layer below
 		# 		 WPP_mat: matrix connecting pyramidal to pyramidal
-		#		 activation: activation function of pyramidal in layer below
 
 		return WPP_mat @ rPvec
 
 	def calc_vden(self, rPvec, WIP_mat):
 		# returns dendritic voltages in inteneurons
-		# input: uPvec: vector of pyramidal voltages in layer below
+		# input: rPvec: vector of rates from pyramidal voltages in layer below
 		# 		 WIP_mat: matrix connecting pyramidal to pyramidal
-		#		 activation: activation function of pyramidal in layer below
 
 		return WIP_mat @ rPvec
 
@@ -192,6 +189,8 @@ class model:
 		self.rP_breve = [self.activation[i](self.uP_breve[i]) for i in range(len(self.uP_breve))]
 		self.rI_breve = [self.activation[i](self.uI_breve[i]) for i in range(len(self.uI_breve))]
 
+		# before modifying uP and uI, we need to save copy
+		# for future calculation of u_breve
 		self.uP_old = copy.deepcopy(self.uP)
 		self.uI_old = copy.deepcopy(self.uI)
 
@@ -208,17 +207,23 @@ class model:
 			self.vapi[i] = self.calc_vapi(self.rP_breve[-1], self.BPP[i], self.rI_breve[-1], self.BPI[i])
 
 		# update somatic potentials
-		delta_uI = - self.gl * self.uI[-1] + self.gden * (self.vden[-1] - self.uI[-1])
-		delta_uI += self.gnI * (self.uP[-1] - self.uI[-1])
+		ueffI = self.taueffI[-1] * (self.gden * self.vden[-1] + self.gnI * self.uP[-1])
+		delta_uI = (ueffI - self.uI[-1]) / self.taueffI[-1]
+		# delta_uI = - self.gl * self.uI[-1] + self.gden * (self.vden[-1] - self.uI[-1])
+		# delta_uI = self.gnI * (self.uP[-1] - self.uI[-1])
 		self.uI[-1] += self.dt * delta_uI
 
 		for i in range(0, len(self.layers)-2):
-			delta_uP = - self.gl * self.uP[i] + self.gbas * (self.vbas[i] - self.uP[i])
-			delta_uP += self.gapi * (self.vapi[i] - self.uP[i])
+			ueffP = self.taueffP[i] * (self.gbas * self.vbas[i] + self.gapi * self.vapi[i])
+			delta_uP = (ueffP - self.uP[i]) / self.taueffP[i]
+			# delta_uP = - self.gl * self.uP[i] + self.gbas * (self.vbas[i] - self.uP[i])
+			# delta_uP += self.gapi * (self.vapi[i] - self.uP[i])
 			self.uP[i] += self.dt * delta_uP
 
-		delta_uP = - self.gl * self.uP[-1] + self.gbas * (self.vbas[-1] - self.uP[-1])
-		delta_uP += self.gntgt * (self.utgt[-1] - self.uP[-1])
+		ueffP = self.taueffP[-1] * (self.gbas * self.vbas[-1] + self.gntgt * self.utgt[-1])
+		# delta_uP = - self.gl * self.uP[-1] + self.gbas * (self.vbas[-1] - self.uP[-1])
+		# delta_uP += self.gntgt * (self.utgt[-1] - self.uP[-1])
+		delta_uP = (ueffP - self.uP[-1]) / self.taueffP[-1]
 		self.uP[-1] += self.dt * delta_uP
 
 
