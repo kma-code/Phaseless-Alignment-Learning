@@ -218,7 +218,7 @@ class model:
 			self.uP[i] += self.dt * delta_uP
 
 		if u_tgt is not None:
-			ueffP = self.taueffP[-1] * (self.gbas * self.vbas[-1] + self.gntgt * self.utgt[-1])
+			ueffP = self.taueffP[-1] * (self.gbas * self.vbas[-1] + self.gntgt * u_tgt[-1])
 			delta_uP = (ueffP - self.uP[-1]) / self.taueffP[-1]
 		else:
 			ueffP = self.taueffP_notgt[-1] * (self.gbas * self.vbas[-1])
@@ -247,7 +247,7 @@ class model:
 					self.uP_breve[i] - self.activation[i](self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas[i]),
 													self.rP_breve[i-1])
 		# output layer
-		self.WPP[-1] += self.eta_fw[-1] * np.outer(
+		self.WPP[-1] += self.dt * self.eta_fw[-1] * np.outer(
 					self.uP_breve[-1] - self.activation[-1](self.gbas / (self.gl + self.gbas) * self.vbas[-1]),
 													self.rP_breve[-2])
 
