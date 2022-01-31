@@ -65,6 +65,9 @@ class model:
 		self.BPP = BPP_init
 		self.BPI = BPI_init
 
+		if self.model == "BP":
+			self.set_weights(BPP = [WPP.T for WPP in self.WPP[1:]])
+
 		self.gl = gl
 		self.gden = gden
 		self.gbas = gbas
@@ -239,16 +242,16 @@ class model:
 		# input layer
 		if r0 is not None:
 			self.WPP[0] += self.dt * self.eta_fw[0] * np.outer(
-					self.uP_breve[0] - self.activation[0](self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas[0]),
+					self.rP_breve[0] - self.activation[0](self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas[0]),
 													r0)
 		# hidden layers
 		for i in range(1, len(self.WPP)-1):
 			self.WPP[i] += self.dt * self.eta_fw[i] * np.outer(
-					self.uP_breve[i] - self.activation[i](self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas[i]),
+					self.rP_breve[i] - self.activation[i](self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas[i]),
 													self.rP_breve[i-1])
 		# output layer
 		self.WPP[-1] += self.dt * self.eta_fw[-1] * np.outer(
-					self.uP_breve[-1] - self.activation[-1](self.gbas / (self.gl + self.gbas) * self.vbas[-1]),
+					self.rP_breve[-1] - self.activation[-1](self.gbas / (self.gl + self.gbas) * self.vbas[-1]),
 													self.rP_breve[-2])
 
 		"""
@@ -257,7 +260,7 @@ class model:
 		"""
 
 		self.WIP[-1] += self.dt * self.eta_IP[-1] * np.outer(
-					self.uI_breve[-1] - self.activation[-1](self.gden / (self.gl + self.gden) * self.vden[-1]),
+					self.rI_breve[-1] - self.activation[-1](self.gden / (self.gl + self.gden) * self.vden[-1]),
 													self.rP_breve[-2])
 
 		"""
@@ -276,6 +279,9 @@ class model:
 		if self.model == 'FA':
 			# do nothing
 			0
+
+		elif self.model == 'BP':
+			self.set_weights(BPP = [WPP.T for WPP in self.WPP[1:]])
 
 
 
