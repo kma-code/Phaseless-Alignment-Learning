@@ -1,5 +1,6 @@
 import numpy as np
 import copy
+import inspect
 #import matplotlib.pyplot as plt
 
 # define activation functions
@@ -59,6 +60,10 @@ class model:
 		self.vbas = [np.zeros_like(uP) for uP in self.uP]
 		self.vden = [np.zeros_like(uI) for uI in self.uI]
 		self.vapi = [np.zeros_like(uP) for uP in self.uP[:-1]]
+		# and make copies
+		self.vbas_old = [np.zeros_like(uP) for uP in self.uP]
+		self.vden_old = [np.zeros_like(uI) for uI in self.uI]
+		self.vapi_old = [np.zeros_like(uP) for uP in self.uP[:-1]]
 
 		self.WPP = WPP_init
 		self.WIP = WIP_init
@@ -87,6 +92,15 @@ class model:
 		self.eta_IP = eta_IP
 		self.eta_PI = eta_PI
 
+		# calculate lookahead
+		self.uP_breve = [self.prospective_voltage(self.uP[i], self.uP_old[i], self.taueffP[i]) for i in range(len(self.uP))]
+		self.uI_breve = [self.prospective_voltage(self.uI[i], self.uI_old[i], self.taueffI[i]) for i in range(len(self.uI))]
+		# calculate rate of lookahead: phi(ubreve)
+		self.rP_breve = [self.activation[i](self.uP_breve[i]) for i in range(len(self.uP_breve))]
+		self.rI_breve = [self.activation[-1](self.uI_breve[-1])]
+
+		self.r0 = np.zeros(self.layers[0])
+
 	def calc_taueff(self):
 		# calculate tau_eff for pyramidals and interneuron
 		# taueffP is one value per layer
@@ -111,16 +125,21 @@ class model:
 		return self.WPP, self.WIP, self.BPP, self.BPI
 
 
-	def set_weights(self, WPP=None, WIP=None, BPP=None, BPI=None):
-		if WPP is not None: self.WPP = WPP
-		if WIP is not None: self.WIP = WIP
-		if BPP is not None: self.BPP = BPP
-		if BPI is not None: self.BPI = BPI
+	def set_weights(self, model=None, WPP=None, WIP=None, BPP=None, BPI=None):
+		# if another model is given, copy its weights
+		if hasattr(model, '__dict__'):
+			WPP, WIP, BPP, BPI = model.get_weights()
+			print(f"Copying weights from model {model}")
+
+		if WPP is not None: self.WPP = copy.deepcopy(WPP)
+		if WIP is not None: self.WIP = copy.deepcopy(WIP)
+		if BPP is not None: self.BPP = copy.deepcopy(BPP)
+		if BPI is not None: self.BPI = copy.deepcopy(BPI)
 
 
 	def set_self_predicting_state(self):
 
-		# set WIP and BIP to values corresponding to self-predicting state
+		# set WIP and BPI to values corresponding to self-predicting state
 		for i in range(0, len(self.BPI)):
 			self.BPI[i] = - self.BPP[i]
 		self.WIP[-1] = self.gbas * (self.gl + self.gden) / (self.gden * (self.gl + self.gbas)) * self.WPP[-1]
@@ -128,16 +147,29 @@ class model:
 	def get_voltages(self):
 		return self.uP, self.uI
 
+	def get_old_voltages(self):
+		return self.uP_old, self.uI_old
 
-	def set_voltages(self, uP=None, uI=None):
+
+	def set_voltages(self, model=None, uP=None, uP_old=None, uI=None, uI_old=None):
+		# if another model is given, copy its voltages
+		if hasattr(model, '__dict__'):
+			uP, uI = model.get_voltages()
+			uP_old, uI_old = model.get_old_voltages()
+			print(f"Copying voltages from model {model}")
 
 		if uP is not None:
 			for i in range(len(self.layers)-1):
-				print(i)
-				self.uP[i] = uP[i]
+				self.uP[i] = copy.deepcopy(uP[i])
+
+		if uP_old is not None:
+			for i in range(len(self.layers)-1):
+				self.uP_old[i] = copy.deepcopy(uP_old[i])
 
 		if uI is not None:
-			self.uI = uI
+			self.uI = copy.deepcopy(uI)
+		if uI_old is not None:
+			self.uI_old = copy.deepcopy(uI_old)
 
 	def calc_vapi(self, rPvec, BPP_mat, rIvec, BPI_mat):
 		# returns apical voltages in pyramidals of a given layer
@@ -168,7 +200,7 @@ class model:
 		return uvec_old + tau * (uvec - uvec_old) / self.dt
 
 
-	def evolve_system(self, r0=None, u_tgt=None):
+	def evolve_system(self, r0=None, u_tgt=None, learn_weights=True):
 
 		""" evolves the system by one time step:
 			updates synaptic weights and voltages
@@ -177,14 +209,41 @@ class model:
 
 		self.Time += self.dt
 
-		self.evolve_voltages(r0, u_tgt) # includes recalc of rP_breve
-		self.evolve_synapses(r0)
+		self.duP, self.duI = self.evolve_voltages(r0, u_tgt) # includes recalc of rP_breve
+		if learn_weights:
+			self.dWPP, self.dWIP, self.dBPP, self.dBPI = self.evolve_synapses(r0)
+
+		# apply evolution
+		for i in range(len(self.duP)):
+			self.uP[i] += self.duP[i]
+		for i in range(len(self.duI)):
+			self.uI [i]+= self.duI[i]
+
+		if learn_weights:
+			for i in range(len(self.dWPP)):
+				self.WPP[i] += self.dWPP[i]
+			for i in range(len(self.dWIP)):
+				self.WIP[i] += self.dWIP[i]
+			for i in range(len(self.dBPP)):
+				self.BPP[i] += self.dBPP[i]
+			for i in range(len(self.dBPI)):
+				self.BPI[i] += self.dBPI[i]
 
 
 	def evolve_voltages(self, r0=None, u_tgt=None):
 		""" Evolves the pyramidal and interneuron voltages by one dt """
 		""" using r0 as input rates """
 
+		self.duP = [np.zeros_like(uP) for uP in self.uP]
+		self.duI = [np.zeros_like(uI) for uI in self.uI]
+
+		# same for dendritic voltages and rates
+		self.rP_breve_old = copy.deepcopy(self.rP_breve)
+		self.rI_breve_old = copy.deepcopy(self.rI_breve)
+		self.r0_old = copy.deepcopy(self.r0)
+		self.vbas_old = copy.deepcopy(self.vbas)
+		self.vden_old = copy.deepcopy(self.vden)
+		self.vapi_old = copy.deepcopy(self.vapi)
 
 		# calculate lookahead
 		self.uP_breve = [self.prospective_voltage(self.uP[i], self.uP_old[i], self.taueffP[i]) for i in range(len(self.uP))]
@@ -192,15 +251,16 @@ class model:
 		# calculate rate of lookahead: phi(ubreve)
 		self.rP_breve = [self.activation[i](self.uP_breve[i]) for i in range(len(self.uP_breve))]
 		self.rI_breve = [self.activation[-1](self.uI_breve[-1])]
+		self.r0 = r0
 
-		# before modifying uP and uI, we need to save copy
+		# before modifying uP and uI, we need to save copies
 		# for future calculation of u_breve
 		self.uP_old = copy.deepcopy(self.uP)
 		self.uI_old = copy.deepcopy(self.uI)
 
 		# calculate dendritic voltages from lookahead
 		if r0 is not None:
-			self.vbas[0] = self.WPP[0] @ r0
+			self.vbas[0] = self.WPP[0] @ self.r0
 
 		for i in range(1, len(self.layers)-1):
 			self.vbas[i] = self.calc_vbas(self.rP_breve[i-1], self.WPP[i])
@@ -210,15 +270,16 @@ class model:
 		for i in range(0, len(self.layers)-2):
 			self.vapi[i] = self.calc_vapi(self.rP_breve[-1], self.BPP[i], self.rI_breve[-1], self.BPI[i])
 
+
 		# update somatic potentials
 		ueffI = self.taueffI[-1] * (self.gden * self.vden[-1] + self.gnI * self.uP_breve[-1])
 		delta_uI = (ueffI - self.uI[-1]) / self.taueffI[-1]
-		self.uI[-1] += self.dt * delta_uI
+		self.duI[-1] = self.dt * delta_uI
 
 		for i in range(0, len(self.layers)-2):
 			ueffP = self.taueffP[i] * (self.gbas * self.vbas[i] + self.gapi * self.vapi[i])
 			delta_uP = (ueffP - self.uP[i]) / self.taueffP[i]
-			self.uP[i] += self.dt * delta_uP
+			self.duP[i] = self.dt * delta_uP
 
 		if u_tgt is not None:
 			ueffP = self.taueffP[-1] * (self.gbas * self.vbas[-1] + self.gntgt * u_tgt[-1])
@@ -226,10 +287,14 @@ class model:
 		else:
 			ueffP = self.taueffP_notgt[-1] * (self.gbas * self.vbas[-1])
 			delta_uP = (ueffP - self.uP[-1]) / self.taueffP[-1]
-		self.uP[-1] += self.dt * delta_uP
+		self.duP[-1] = self.dt * delta_uP
+
+		return self.duP, self.duI
+
+		
 
 
-	def evolve_synapses(self, r0=None):
+	def evolve_synapses(self, r0):
 		
 		""" evolves all synapses by a dt """
 
@@ -239,29 +304,37 @@ class model:
 
 		"""
 
+		self.dWPP = [np.zeros_like(WPP) for WPP in self.WPP]
+		self.dWIP = [np.zeros_like(WIP) for WIP in self.WIP]
+		self.dBPP = [np.zeros_like(BPP) for BPP in self.BPP]
+		self.dBPI = [np.zeros_like(BPI) for BPI in self.BPI]
+
 		# input layer
 		if r0 is not None:
-			self.WPP[0] += self.dt * self.eta_fw[0] * np.outer(
-					self.rP_breve[0] - self.activation[0](self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas[0]),
-													r0)
+			# print("updating WPP0")
+			self.dWPP[0] = self.dt * self.eta_fw[0] * np.outer(
+					self.rP_breve[0] - self.activation[0](self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[0]),
+													self.r0_old) #CHECK WITH LAURA
 		# hidden layers
 		for i in range(1, len(self.WPP)-1):
-			self.WPP[i] += self.dt * self.eta_fw[i] * np.outer(
-					self.rP_breve[i] - self.activation[i](self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas[i]),
-													self.rP_breve[i-1])
+			# print(f"updating WPP{i}")
+			self.dWPP[i] = self.dt * self.eta_fw[i] * np.outer(
+					self.rP_breve[i] - self.activation[i](self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[i]),
+													self.rP_breve_old[i-1])
 		# output layer
-		self.WPP[-1] += self.dt * self.eta_fw[-1] * np.outer(
-					self.rP_breve[-1] - self.activation[-1](self.gbas / (self.gl + self.gbas) * self.vbas[-1]),
-													self.rP_breve[-2])
+		# print("updating WPP-1")
+		self.dWPP[-1] = self.dt * self.eta_fw[-1] * np.outer(
+					self.rP_breve[-1] - self.activation[-1](self.gbas / (self.gl + self.gbas) * self.vbas_old[-1]),
+													self.rP_breve_old[-2])
 
 		"""
 			plasticity of WIP
 
 		"""
 
-		self.WIP[-1] += self.dt * self.eta_IP[-1] * np.outer(
-					self.rI_breve[-1] - self.activation[-1](self.gden / (self.gl + self.gden) * self.vden[-1]),
-													self.rP_breve[-2])
+		self.dWIP[-1] = self.dt * self.eta_IP[-1] * np.outer(
+					self.rI_breve[-1] - self.activation[-1](self.gden / (self.gl + self.gden) * self.vden_old[-1]),
+													self.rP_breve_old[-2])
 
 		"""
 			plasticity of BPI
@@ -269,7 +342,7 @@ class model:
 		"""
 
 		for i in range(0, len(self.BPI)):
-			self.BPI[i] += self.dt * self.eta_PI[i] * np.outer(-self.vapi[i], self.rI_breve[-1])
+			self.dBPI[i] = self.dt * self.eta_PI[i] * np.outer(-self.vapi[i], self.rI_breve_old[-1])
 
 		"""
 			plasticity of BPP
@@ -282,6 +355,11 @@ class model:
 
 		elif self.model == 'BP':
 			self.set_weights(BPP = [WPP.T for WPP in self.WPP[1:]])
+
+
+		return self.dWPP, self.dWIP, self.dBPP, self.dBPI 
+
+
 
 
 
