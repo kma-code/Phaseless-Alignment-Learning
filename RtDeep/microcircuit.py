@@ -30,6 +30,11 @@ def d_tanh(x):
 def cos_sim(A, B):
     return np.trace(A.T @ B) / np.linalg.norm(A) / np.linalg.norm(B)
 
+def deepcopy_array(array):
+	""" makes a deep copy of an array of np-arrays """
+	out = [nparray.copy() for nparray in array]
+	return out.copy()
+
 
 class model:
 	""" This class implements a generic microcircuit model """
@@ -41,12 +46,12 @@ class model:
 
 		self.model = model # FA, BP or PBP
 		self.layers = layers
-		self.uP = copy.deepcopy(uP_init)
-		self.uI = copy.deepcopy(uI_init)
+		self.uP = deepcopy_array(uP_init)
+		self.uI = deepcopy_array(uI_init)
 		# we also set up a buffer of voltages,
 		# which corresponds to the value at the last time step
-		self.uP_old = copy.deepcopy(self.uP)
-		self.uI_old = copy.deepcopy(self.uI)
+		self.uP_old = deepcopy_array(self.uP)
+		self.uI_old = deepcopy_array(self.uI)
 
 		# apply activation layer-wise,
 		# so that we can easily disable it e.g. for last layer
@@ -234,16 +239,17 @@ class model:
 		""" Evolves the pyramidal and interneuron voltages by one dt """
 		""" using r0 as input rates """
 
-		self.duP = [np.zeros_like(uP) for uP in self.uP]
-		self.duI = [np.zeros_like(uI) for uI in self.uI]
+		self.duP = [np.zeros(shape=uP.shape) for uP in self.uP]
+		self.duI = [np.zeros(shape=uI.shape) for uI in self.uI]
 
 		# same for dendritic voltages and rates
-		self.rP_breve_old = copy.deepcopy(self.rP_breve)
-		self.rI_breve_old = copy.deepcopy(self.rI_breve)
-		self.r0_old = copy.deepcopy(self.r0)
-		self.vbas_old = copy.deepcopy(self.vbas)
-		self.vden_old = copy.deepcopy(self.vden)
-		self.vapi_old = copy.deepcopy(self.vapi)
+		self.rP_breve_old = deepcopy_array(self.rP_breve)
+		self.rI_breve_old = deepcopy_array(self.rI_breve)
+		if r0 is not None:
+			self.r0_old = self.r0.copy()
+		self.vbas_old = deepcopy_array(self.vbas)
+		self.vden_old = deepcopy_array(self.vden)
+		self.vapi_old = deepcopy_array(self.vapi)
 
 		# calculate lookahead
 		self.uP_breve = [self.prospective_voltage(self.uP[i], self.uP_old[i], self.taueffP[i]) for i in range(len(self.uP))]
@@ -255,8 +261,8 @@ class model:
 
 		# before modifying uP and uI, we need to save copies
 		# for future calculation of u_breve
-		self.uP_old = copy.deepcopy(self.uP)
-		self.uI_old = copy.deepcopy(self.uI)
+		self.uP_old = deepcopy_array(self.uP)
+		self.uI_old = deepcopy_array(self.uI)
 
 		# calculate dendritic voltages from lookahead
 		if r0 is not None:
