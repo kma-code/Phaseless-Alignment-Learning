@@ -136,10 +136,10 @@ class model:
 			WPP, WIP, BPP, BPI = model.get_weights()
 			print(f"Copying weights from model {model}")
 
-		if WPP is not None: self.WPP = copy.deepcopy(WPP)
-		if WIP is not None: self.WIP = copy.deepcopy(WIP)
-		if BPP is not None: self.BPP = copy.deepcopy(BPP)
-		if BPI is not None: self.BPI = copy.deepcopy(BPI)
+		if WPP is not None: self.WPP = deepcopy_array(WPP)
+		if WIP is not None: self.WIP = deepcopy_array(WIP)
+		if BPP is not None: self.BPP = deepcopy_array(BPP)
+		if BPI is not None: self.BPI = deepcopy_array(BPI)
 
 
 	def set_self_predicting_state(self):
@@ -245,7 +245,7 @@ class model:
 		# same for dendritic voltages and rates
 		self.rP_breve_old = deepcopy_array(self.rP_breve)
 		self.rI_breve_old = deepcopy_array(self.rI_breve)
-		if r0 is not None:
+		if self.r0 is not None:
 			self.r0_old = self.r0.copy()
 		self.vbas_old = deepcopy_array(self.vbas)
 		self.vden_old = deepcopy_array(self.vden)
@@ -310,17 +310,17 @@ class model:
 
 		"""
 
-		self.dWPP = [np.zeros_like(WPP) for WPP in self.WPP]
-		self.dWIP = [np.zeros_like(WIP) for WIP in self.WIP]
-		self.dBPP = [np.zeros_like(BPP) for BPP in self.BPP]
-		self.dBPI = [np.zeros_like(BPI) for BPI in self.BPI]
+		self.dWPP = [np.zeros(shape=WPP.shape) for WPP in self.WPP]
+		self.dWIP = [np.zeros(shape=WIP.shape) for WIP in self.WIP]
+		self.dBPP = [np.zeros(shape=BPP.shape) for BPP in self.BPP]
+		self.dBPI = [np.zeros(shape=BPI.shape) for BPI in self.BPI]
 
 		# input layer
 		if r0 is not None:
 			# print("updating WPP0")
 			self.dWPP[0] = self.dt * self.eta_fw[0] * np.outer(
 					self.rP_breve[0] - self.activation[0](self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[0]),
-													self.r0_old) #CHECK WITH LAURA
+													self.r0_old)
 		# hidden layers
 		for i in range(1, len(self.WPP)-1):
 			# print(f"updating WPP{i}")
@@ -348,7 +348,8 @@ class model:
 		"""
 
 		for i in range(0, len(self.BPI)):
-			self.dBPI[i] = self.dt * self.eta_PI[i] * np.outer(-self.vapi[i], self.rI_breve_old[-1])
+			if self.eta_PI[i] != 0:
+				self.dBPI[i] = self.dt * self.eta_PI[i] * np.outer(-self.vapi[i], self.rI_breve_old[-1])
 
 		"""
 			plasticity of BPP
