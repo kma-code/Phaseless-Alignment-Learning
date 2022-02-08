@@ -35,6 +35,9 @@ def deepcopy_array(array):
 	out = [nparray.copy() for nparray in array]
 	return out.copy()
 
+def MSE(output, target):
+	return (output - target).mean()
+
 
 class model:
 	""" This class implements a generic microcircuit model """
@@ -146,8 +149,8 @@ class model:
 
 		# set WIP and BPI to values corresponding to self-predicting state
 		for i in range(0, len(self.BPI)):
-			self.BPI[i] = - self.BPP[i]
-		self.WIP[-1] = self.gbas * (self.gl + self.gden) / (self.gden * (self.gl + self.gbas)) * self.WPP[-1]
+			self.BPI[i] = - self.BPP[i].copy()
+		self.WIP[-1] = self.gbas * (self.gl + self.gden) / (self.gden * (self.gl + self.gbas)) * self.WPP[-1].copy()
 
 	def get_voltages(self):
 		return self.uP, self.uI
