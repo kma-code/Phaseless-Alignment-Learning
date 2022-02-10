@@ -39,10 +39,10 @@ def MSE(output, target):
 	return (output - target).mean()
 
 
-class model:
+class base_model:
 	""" This class implements a generic microcircuit model """
 
-	def __init__(self, dt, tauxi, Tpres, model, activation, d_activation, layers,
+	def __init__(self, dt, Tpres, model, activation, d_activation, layers,
 					uP_init, uI_init, WPP_init, WIP_init, BPP_init, BPI_init,
 					gl, gden, gbas, gapi, gnI, gntgt,
 					eta_fw, eta_bw, eta_PI, eta_IP):
@@ -90,7 +90,6 @@ class model:
 
 		self.Time = 0 # initialize a model timer
 		self.dt = dt
-		self.tauxi = tauxi
 		self.Tpres = Tpres
 		self.taueffP, self.taueffP_notgt, self.taueffI = self.calc_taueff()
 
@@ -372,7 +371,21 @@ class model:
 
 
 
+class phased_noise_model(base_model):
+	""" This class inherits all properties from the base model class and adds the function to add phased noise """
+	def __init__(self, dt, tauxi, Tpres, model, activation, d_activation, layers,
+					uP_init, uI_init, WPP_init, WIP_init, BPP_init, BPI_init,
+					gl, gden, gbas, gapi, gnI, gntgt,
+					eta_fw, eta_bw, eta_PI, eta_IP):
 
+		# init base_model with same settings
+		super().__init__(dt=dt, Tpres=Tpres, model=model, activation=activation, d_activation=d_activation, layers=layers,
+            uP_init=uP_init, uI_init=uI_init,
+            WPP_init=WPP_init, WIP_init=WIP_init, BPP_init=BPP_init, BPI_init=BPI_init,
+            gl=gl, gden=gden, gbas=gbas, gapi=gapi, gnI=gnI, gntgt=gntgt,
+            eta_fw=eta_fw, eta_bw=eta_bw, eta_PI=eta_PI, eta_IP=eta_IP)
+
+		self.tauxi = tauxi
 
 
 
