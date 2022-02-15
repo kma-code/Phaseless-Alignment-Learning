@@ -421,7 +421,8 @@ class phased_noise_model(base_model):
 		self.active_bw_syn = 0
 		# gaussian noise properties
 		self.noise_scale = noise_scale
-		self.noise = None
+		self.noise = [np.zeros(shape=uP.shape) for uP in self.uP]
+		self.noise_breve = [np.zeros(shape=uP.shape) for uP in self.uP]
 
 		# init a counter for time steps after which to resample noise
 		self.noise_counter = 0
@@ -487,17 +488,25 @@ class phased_noise_model(base_model):
 
 	def inject_noise(self, layer, noise_scale):
 
+		"""
+			 this function injects noise into a given layer
+		"""
+
+		# save current noise for noise_breve
+		self.noise_old = deepcopy_array(self.noise)
+
 		# if dtxi timesteps have passed, sample new noise
-		if self.noise == None or self.noise_counter % self.noise_total_counts == 0:
-			# print(self.Time, self.uP[layer], self.noise)
+		if np.all(self.noise[layer] == 0) or self.noise_counter % self.noise_total_counts == 0:
 
 			stdev = noise_scale[layer] * np.max(np.abs(self.uP[layer]))
-			self.noise = np.random.normal(loc=0, scale=stdev, size=self.uP[layer].shape)
+			self.noise[layer] = np.random.normal(loc=0, scale=stdev, size=self.uP[layer].shape)
 			self.noise_counter = 0
 
 		self.noise_counter += 1
 
-		self.uP[layer] += self.noise
+		self.uP[layer] += self.noise[layer]
+		self.noise_breve[layer] = self.prospective_voltage(self.noise[layer], self.noise_old[layer], self.taueffP[layer])
+
 
 	def calc_rP_breve_HI(self):
 		# updates the high-passed instantaneous rate rP_breve_HI which is used to update BPP
@@ -541,7 +550,9 @@ class phased_noise_model(base_model):
 		self.dBPP = [np.zeros(shape=BPP.shape) for BPP in self.BPP]
 
 		if self.model == "LDRL":
-			self.dBPP[active_bw_syn] = self.dt * self.eta_bw[active_bw_syn] * np.outer(self.noise, self.rP_breve_HI[active_bw_syn])
+			self.dBPP[active_bw_syn] = - self.dt * self.eta_bw[active_bw_syn] * np.outer(
+				self.noise_breve[active_bw_syn], self.rP_breve_HI[-1]
+				)
 			# add regularizer
 			self.dBPP[active_bw_syn] -= self.dt * self.alpha[active_bw_syn] * self.eta_bw[active_bw_syn] * self.BPP[active_bw_syn]
 
