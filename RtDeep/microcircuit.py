@@ -1,6 +1,7 @@
 import numpy as np
 import copy
 import inspect
+from scipy import signal
 #import matplotlib.pyplot as plt
 
 # define activation functions
@@ -73,10 +74,10 @@ class base_model:
 		self.vden_old = [np.zeros_like(uI) for uI in self.uI]
 		self.vapi_old = [np.zeros_like(uP) for uP in self.uP[:-1]]
 
-		self.WPP = WPP_init
-		self.WIP = WIP_init
-		self.BPP = BPP_init
-		self.BPI = BPI_init
+		self.WPP = deepcopy_array(WPP_init)
+		self.WIP = deepcopy_array(WIP_init)
+		self.BPP = deepcopy_array(BPP_init)
+		self.BPI = deepcopy_array(BPI_init)
 
 		if self.model == "BP":
 			self.set_weights(BPP = [WPP.T for WPP in self.WPP[1:]])
@@ -202,9 +203,11 @@ class base_model:
 		return WIP_mat @ rPvec
 
 
-	def prospective_voltage(self, uvec, uvec_old, tau):
+	def prospective_voltage(self, uvec, uvec_old, tau, dt=None):
 		# returns an approximation of the lookahead of voltage vector u at current time
-		return uvec_old + tau * (uvec - uvec_old) / self.dt
+		if dt == None:
+			dt = self.dt
+		return uvec_old + tau * (uvec - uvec_old) / dt
 
 
 	def evolve_system(self, r0=None, u_tgt=None, learn_weights=True):
@@ -214,7 +217,8 @@ class base_model:
 			given input rate r0
 		"""
 
-		self.Time += self.dt
+		# increase timer by dt and round float to nearest dt
+		self.Time = np.round(self.Time + self.dt, decimals=np.int(-np.log10(self.dt)))
 
 		self.duP, self.duI = self.evolve_voltages(r0, u_tgt) # includes recalc of rP_breve
 		if learn_weights:
@@ -266,6 +270,14 @@ class base_model:
 		self.uP_old = deepcopy_array(self.uP)
 		self.uI_old = deepcopy_array(self.uI)
 
+		self.vbas, self.vapi, self.vden = self.calc_dendritic_updates(r0, u_tgt)
+		self.duP, self.duI = self.calc_somatic_updates(u_tgt)
+
+		return self.duP, self.duI
+
+	
+	def calc_dendritic_updates(self, r0=None, u_tgt=None):
+
 		# calculate dendritic voltages from lookahead
 		if r0 is not None:
 			self.vbas[0] = self.WPP[0] @ self.r0
@@ -278,6 +290,16 @@ class base_model:
 		for i in range(0, len(self.layers)-2):
 			self.vapi[i] = self.calc_vapi(self.rP_breve[-1], self.BPP[i], self.rI_breve[-1], self.BPI[i])
 
+		return self.vbas, self.vapi, self.vden
+
+
+
+
+	def calc_somatic_updates(self, u_tgt=None):
+		"""
+			calculates somatic updates from dendritic potentials
+
+		"""
 
 		# update somatic potentials
 		ueffI = self.taueffI[-1] * (self.gden * self.vden[-1] + self.gnI * self.uP_breve[-1])
@@ -373,7 +395,7 @@ class base_model:
 
 class phased_noise_model(base_model):
 	""" This class inherits all properties from the base model class and adds the function to add phased noise """
-	def __init__(self, dt, tauxi, Tpres, model, activation, d_activation, layers,
+	def __init__(self, dt, dtxi, tausyn, Tbw, Tpres, noise_scale, alpha, model, activation, d_activation, layers,
 					uP_init, uI_init, WPP_init, WIP_init, BPP_init, BPI_init,
 					gl, gden, gbas, gapi, gnI, gntgt,
 					eta_fw, eta_bw, eta_PI, eta_IP):
@@ -385,7 +407,161 @@ class phased_noise_model(base_model):
             gl=gl, gden=gden, gbas=gbas, gapi=gapi, gnI=gnI, gntgt=gntgt,
             eta_fw=eta_fw, eta_bw=eta_bw, eta_PI=eta_PI, eta_IP=eta_IP)
 
-		self.tauxi = tauxi
+		# new variables:
+		# noise time scale
+		self.dtxi = dtxi
+		# decimals of dt
+		self.dt_decimals = np.int(-np.log10(self.dt))
+		# synaptic time constant (sets the low-pass filter of interneuron)
+		self.tausyn = tausyn
+		# time scale of backward learning phase
+		self.Tbw = Tbw
+		# define a variable for currently learnt backwards synapse
+		# init at last synapse
+		self.active_bw_syn = 0
+		# gaussian noise properties
+		self.noise_scale = noise_scale
+		self.noise = None
+
+		# init a counter for time steps after which to resample noise
+		self.noise_counter = 0
+		self.noise_total_counts = np.round(self.dtxi / self.dt, decimals=self.dt_decimals)
+
+		# init a high-pass filtered version of rP_breve
+		self.rP_breve_HI = deepcopy_array(self.rP_breve)
+
+		# regularizer for backward weights
+		self.alpha = alpha
+
+
+	def evolve_system(self, r0=None, u_tgt=None, learn_weights=True, learn_bw_weights=True):
+
+		""" 
+			This overwrites the vanilla system evolution and implements
+			phased noise
+		"""
+
+		# update which backwards weights to learn
+		if learn_bw_weights and self.Time % self.Tbw == 0:
+			print(f"Current time: {self.Time}s")
+			self.active_bw_syn = 0 if self.active_bw_syn == len(self.BPP) - 1 else self.active_bw_syn + 1
+			print(f"Learning backward weights to layer {self.active_bw_syn + 1}")
+			self.noise_counter = 0
+
+		# inject noise
+		if learn_bw_weights: self.inject_noise(layer=self.active_bw_syn, noise_scale=self.noise_scale)
+
+		# calculate voltage evolution, including low pass on interneuron synapses
+		# see calc_dendritic updates below
+		self.duP, self.duI = self.evolve_voltages(r0, u_tgt) # includes recalc of rP_breve
+
+		# calculate hi-passed rP_breve for synapse BPP
+		self.rP_breve_HI = self.calc_rP_breve_HI()
+
+
+		if learn_weights:
+			self.dWPP, self.dWIP, _, self.dBPI = self.evolve_synapses(r0)
+		if learn_bw_weights:
+			self.dBPP = self.evolve_bw_synapses(self.active_bw_syn)
+
+		# apply evolution
+		for i in range(len(self.duP)):
+			self.uP[i] += self.duP[i]
+		for i in range(len(self.duI)):
+			self.uI [i]+= self.duI[i]
+
+		if learn_weights:
+			for i in range(len(self.dWPP)):
+				self.WPP[i] += self.dWPP[i]
+			for i in range(len(self.dWIP)):
+				self.WIP[i] += self.dWIP[i]
+			for i in range(len(self.dBPI)):
+				self.BPI[i] += self.dBPI[i]
+		if learn_bw_weights:
+			for i in range(len(self.dBPP)):
+				self.BPP[i] += self.dBPP[i]
+
+		# increase timer
+		self.Time = np.round(self.Time + self.dt, decimals=self.dt_decimals)
+
+
+	def inject_noise(self, layer, noise_scale):
+
+		# if dtxi timesteps have passed, sample new noise
+		if self.noise == None or self.noise_counter % self.noise_total_counts == 0:
+			# print(self.Time, self.uP[layer], self.noise)
+
+			stdev = noise_scale[layer] * np.max(np.abs(self.uP[layer]))
+			self.noise = np.random.normal(loc=0, scale=stdev, size=self.uP[layer].shape)
+			self.noise_counter = 0
+
+		self.noise_counter += 1
+
+		self.uP[layer] += self.noise
+
+	def calc_rP_breve_HI(self):
+		# updates the high-passed instantaneous rate rP_breve_HI which is used to update BPP
+		# High-pass has the form d v_out = d v_in - dt/tau * v_out
+
+		# we will only need rP_breve_HI coming from the final layer, so we freeze the others
+		# for i in range(len(self.rP_breve)):
+		# 	self.rP_breve_HI[i] += (self.rP_breve[i] - self.rP_breve_old[i]) - self.dt / self.tausyn * self.rP_breve_HI[i]
+		self.rP_breve_HI[-1] += (self.rP_breve[-1] - self.rP_breve_old[-1]) - self.dt / self.tausyn * self.rP_breve_HI[-1]
+
+		return self.rP_breve_HI
+
+
+
+	def calc_dendritic_updates(self, r0=None, u_tgt=None):
+
+		"""
+			this overwrites the dendritic updates by adding a low-pass on
+			the interneuron voltages
+
+		"""
+
+		# calculate dendritic voltages from lookahead
+		if r0 is not None:
+			self.vbas[0] = self.WPP[0] @ self.r0
+
+		for i in range(1, len(self.layers)-1):
+			self.vbas[i] = self.calc_vbas(self.rP_breve[i-1], self.WPP[i])
+
+		# add slow response to dendritic compartment of interneurons
+		self.vden[0] += self.dt / self.tausyn * (self.calc_vden(self.rP_breve[-2], self.WIP[-1]) - self.vden[0])
+
+		for i in range(0, len(self.layers)-2):
+			self.vapi[i] = self.calc_vapi(self.rP_breve[-1], self.BPP[i], self.rI_breve[-1], self.BPI[i])
+
+		return self.vbas, self.vapi, self.vden
+
+	def evolve_bw_synapses(self, active_bw_syn):
+		# evolve the synapses in BPP of layer #active_bw_syn
+
+		self.dBPP = [np.zeros(shape=BPP.shape) for BPP in self.BPP]
+
+		if self.model == "LDRL":
+			self.dBPP[active_bw_syn] = self.dt * self.eta_bw[active_bw_syn] * np.outer(self.noise, self.rP_breve_HI[active_bw_syn])
+			# add regularizer
+			self.dBPP[active_bw_syn] -= self.dt * self.alpha[active_bw_syn] * self.eta_bw[active_bw_syn] * self.BPP[active_bw_syn]
+
+
+		return self.dBPP
+
+
+# low pass filter adapted from user3123955 and Warren Weckesser @ SO
+def butter_lowpass(cutoff, fs, order=5):
+    nyq = 0.5 * fs
+    normal_cutoff = cutoff / nyq
+    b, a = signal.butter(order, normal_cutoff, btype='low', analog=False)
+    return b, a
+
+def butter_lowpass_filter(data, cutoff, fs, order=5):
+    b, a = butter_lowpass(cutoff, fs, order=order)
+    y = signal.filtfilt(b, a, data)
+    return y
+
+
 
 
 
