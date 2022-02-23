@@ -29,7 +29,10 @@ def d_tanh(x):
 
 # cosine similarity between tensors
 def cos_sim(A, B):
-    return np.trace(A.T @ B) / np.linalg.norm(A) / np.linalg.norm(B)
+	if A.ndim == 1 and B.ndim == 1:
+		return A.T @ B / np.linalg.norm(A) / np.linalg.norm(B)
+	else:
+		return np.trace(A.T @ B) / np.linalg.norm(A) / np.linalg.norm(B)
 
 def deepcopy_array(array):
 	""" makes a deep copy of an array of np-arrays """
@@ -395,19 +398,24 @@ class base_model:
 
 class phased_noise_model(base_model):
 	""" This class inherits all properties from the base model class and adds the function to add phased noise """
-	def __init__(self, dt, dtxi, tausyn, Tbw, Tpres, noise_scale, alpha, model, activation, d_activation, layers,
+	def __init__(self, dt, dtxi, tausyn, Tbw, Tpres, noise_scale, alpha, inter_low_pass, pyr_hi_pass, model, activation, d_activation, layers,
 					uP_init, uI_init, WPP_init, WIP_init, BPP_init, BPI_init,
 					gl, gden, gbas, gapi, gnI, gntgt,
 					eta_fw, eta_bw, eta_PI, eta_IP):
 
 		# init base_model with same settings
-		super().__init__(dt=dt, Tpres=Tpres, model=model, activation=activation, d_activation=d_activation, layers=layers,
+		super().__init__(dt=dt, Tpres=Tpres,
+			model=model, activation=activation, d_activation=d_activation, layers=layers,
             uP_init=uP_init, uI_init=uI_init,
             WPP_init=WPP_init, WIP_init=WIP_init, BPP_init=BPP_init, BPI_init=BPI_init,
             gl=gl, gden=gden, gbas=gbas, gapi=gapi, gnI=gnI, gntgt=gntgt,
             eta_fw=eta_fw, eta_bw=eta_bw, eta_PI=eta_PI, eta_IP=eta_IP)
 
 		# new variables:
+
+		# whether to low-pass filter the interneuron dendritic input
+		self.inter_low_pass = inter_low_pass
+		self.pyr_hi_pass = pyr_hi_pass
 		# noise time scale
 		self.dtxi = dtxi
 		# decimals of dt
@@ -449,16 +457,12 @@ class phased_noise_model(base_model):
 			print(f"Learning backward weights to layer {self.active_bw_syn + 1}")
 			self.noise_counter = 0
 
-		# inject noise
-		if learn_bw_weights: self.inject_noise(layer=self.active_bw_syn, noise_scale=self.noise_scale)
-
 		# calculate voltage evolution, including low pass on interneuron synapses
 		# see calc_dendritic updates below
-		self.duP, self.duI = self.evolve_voltages(r0, u_tgt) # includes recalc of rP_breve
+		self.duP, self.duI = self.evolve_voltages(r0, u_tgt, inject_noise=learn_bw_weights) # includes recalc of rP_breve
 
 		# calculate hi-passed rP_breve for synapse BPP
 		self.rP_breve_HI = self.calc_rP_breve_HI()
-
 
 		if learn_weights:
 			self.dWPP, self.dWIP, _, self.dBPI = self.evolve_synapses(r0)
@@ -486,10 +490,54 @@ class phased_noise_model(base_model):
 		self.Time = np.round(self.Time + self.dt, decimals=self.dt_decimals)
 
 
+	def evolve_voltages(self, r0=None, u_tgt=None, inject_noise=False):
+		""" 
+			Overwrites voltage evolution:
+			Evolves the pyramidal and interneuron voltages by one dt
+			using r0 as input rates
+			>> Injects noise into vapi
+		"""
+
+		self.duP = [np.zeros(shape=uP.shape) for uP in self.uP]
+		self.duI = [np.zeros(shape=uI.shape) for uI in self.uI]
+
+		# same for dendritic voltages and rates
+		self.rP_breve_old = deepcopy_array(self.rP_breve)
+		self.rI_breve_old = deepcopy_array(self.rI_breve)
+		if self.r0 is not None:
+			self.r0_old = self.r0.copy()
+		self.vbas_old = deepcopy_array(self.vbas)
+		self.vden_old = deepcopy_array(self.vden)
+		self.vapi_old = deepcopy_array(self.vapi)
+
+		# calculate lookahead
+		self.uP_breve = [self.prospective_voltage(self.uP[i], self.uP_old[i], self.taueffP[i]) for i in range(len(self.uP))]
+		self.uI_breve = [self.prospective_voltage(self.uI[i], self.uI_old[i], self.taueffI[i]) for i in range(len(self.uI))]
+		# calculate rate of lookahead: phi(ubreve)
+		self.rP_breve = [self.activation[i](self.uP_breve[i]) for i in range(len(self.uP_breve))]
+		self.rI_breve = [self.activation[-1](self.uI_breve[-1])]
+		self.r0 = r0
+
+		# before modifying uP and uI, we need to save copies
+		# for future calculation of u_breve
+		self.uP_old = deepcopy_array(self.uP)
+		self.uI_old = deepcopy_array(self.uI)
+
+		self.vbas, self.vapi, self.vden = self.calc_dendritic_updates(r0, u_tgt)
+
+		# inject noise into newly calculated vapi before calculating update du
+		if inject_noise: self.inject_noise(layer=self.active_bw_syn, noise_scale=self.noise_scale)
+
+		self.duP, self.duI = self.calc_somatic_updates(u_tgt)
+
+		return self.duP, self.duI
+
+
 	def inject_noise(self, layer, noise_scale):
 
 		"""
 			 this function injects noise into a given layer
+			 by adding it to the apical potential
 		"""
 
 		# save current noise for noise_breve
@@ -499,14 +547,13 @@ class phased_noise_model(base_model):
 		if np.all(self.noise[layer] == 0) or self.noise_counter % self.noise_total_counts == 0:
 
 			stdev = noise_scale[layer] * np.max(np.abs(self.uP[layer]))
-			self.noise[layer] = np.random.normal(loc=0, scale=stdev, size=self.uP[layer].shape)
+			self.noise[layer] = np.random.normal(loc=0, scale=stdev, size=self.vapi[layer].shape)
 			self.noise_counter = 0
 
 		self.noise_counter += 1
 
-		self.uP[layer] += self.noise[layer]
+		self.vapi[layer] += self.noise[layer]
 		self.noise_breve[layer] = self.prospective_voltage(self.noise[layer], self.noise_old[layer], self.taueffP[layer])
-
 
 	def calc_rP_breve_HI(self):
 		# updates the high-passed instantaneous rate rP_breve_HI which is used to update BPP
@@ -514,7 +561,7 @@ class phased_noise_model(base_model):
 
 		# we will only need rP_breve_HI coming from the final layer, so we freeze the others
 		# for i in range(len(self.rP_breve)):
-		# 	self.rP_breve_HI[i] += (self.rP_breve[i] - self.rP_breve_old[i]) - self.dt / self.tausyn * self.rP_breve_HI[i]
+		#       self.rP_breve_HI[i] += (self.rP_breve[i] - self.rP_breve_old[i]) - self.dt / self.tausyn * self.rP_breve_HI[i]
 		self.rP_breve_HI[-1] += (self.rP_breve[-1] - self.rP_breve_old[-1]) - self.dt / self.tausyn * self.rP_breve_HI[-1]
 
 		return self.rP_breve_HI
@@ -537,7 +584,11 @@ class phased_noise_model(base_model):
 			self.vbas[i] = self.calc_vbas(self.rP_breve[i-1], self.WPP[i])
 
 		# add slow response to dendritic compartment of interneurons
-		self.vden[0] += self.dt / self.tausyn * (self.calc_vden(self.rP_breve[-2], self.WIP[-1]) - self.vden[0])
+		if self.inter_low_pass:
+			self.vden[0] += self.dt / self.tausyn * (self.calc_vden(self.rP_breve[-2], self.WIP[-1]) - self.vden[0])
+		else:
+			# else, instant response
+			self.vden[0] = self.calc_vden(self.rP_breve[-2], self.WIP[-1])
 
 		for i in range(0, len(self.layers)-2):
 			self.vapi[i] = self.calc_vapi(self.rP_breve[-1], self.BPP[i], self.rI_breve[-1], self.BPI[i])
@@ -550,9 +601,14 @@ class phased_noise_model(base_model):
 		self.dBPP = [np.zeros(shape=BPP.shape) for BPP in self.BPP]
 
 		if self.model == "LDRL":
-			self.dBPP[active_bw_syn] = - self.dt * self.eta_bw[active_bw_syn] * np.outer(
-				self.noise_breve[active_bw_syn], self.rP_breve_HI[-1]
-				)
+			if self.pyr_hi_pass:
+				self.dBPP[active_bw_syn] = self.dt * self.eta_bw[active_bw_syn] * np.outer(
+					self.noise[active_bw_syn], self.rP_breve_HI[-1]
+					)
+			else:
+				self.dBPP[active_bw_syn] = self.dt * self.eta_bw[active_bw_syn] * np.outer(
+					self.noise[active_bw_syn], self.rP_breve[-1]
+					)
 			# add regularizer
 			self.dBPP[active_bw_syn] -= self.dt * self.alpha[active_bw_syn] * self.eta_bw[active_bw_syn] * self.BPP[active_bw_syn]
 
