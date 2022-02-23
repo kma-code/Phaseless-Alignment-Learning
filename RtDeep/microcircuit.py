@@ -612,6 +612,20 @@ class phased_noise_model(base_model):
 			# add regularizer
 			self.dBPP[active_bw_syn] -= self.dt * self.alpha[active_bw_syn] * self.eta_bw[active_bw_syn] * self.BPP[active_bw_syn]
 
+		elif self.model == "DTPDRL":
+			if self.pyr_hi_pass:
+				self.dBPP[active_bw_syn] = - self.dt * self.eta_bw[active_bw_syn] * np.outer(
+					self.BPP[active_bw_syn]@self.rP_breve_HI[-1]-self.BPI[active_bw_syn]@self.rI_breve[-1]-self.noise[active_bw_syn],
+					self.rP_breve_HI[-1]
+					)
+			else:
+				self.dBPP[active_bw_syn] = - self.dt * self.eta_bw[active_bw_syn] * np.outer(
+					self.BPP[active_bw_syn]@self.rP_breve[-1]-self.BPI[active_bw_syn]@self.rI_breve[-1]-self.noise[active_bw_syn],
+					self.rP_breve[-1]
+					)
+			# add regularizer
+			self.dBPP[active_bw_syn] -= self.dt * self.alpha[active_bw_syn] * self.eta_bw[active_bw_syn] * self.BPP[active_bw_syn]
+
 
 		return self.dBPP
 
