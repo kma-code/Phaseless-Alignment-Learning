@@ -221,7 +221,7 @@ class base_model:
 		"""
 
 		# increase timer by dt and round float to nearest dt
-		self.Time = np.round(self.Time + self.dt, decimals=np.int(-np.log10(self.dt)))
+		self.Time = np.round(self.Time + self.dt, decimals=np.int(np.round(-np.log10(self.dt))))
 
 		self.duP, self.duI = self.evolve_voltages(r0, u_tgt) # includes recalc of rP_breve
 		if learn_weights:
@@ -419,7 +419,7 @@ class phased_noise_model(base_model):
 		# noise time scale
 		self.dtxi = dtxi
 		# decimals of dt
-		self.dt_decimals = np.int(-np.log10(self.dt))
+		self.dt_decimals = np.int(np.round(-np.log10(self.dt)))
 		# synaptic time constant (sets the low-pass filter of interneuron)
 		self.tausyn = tausyn
 		# time scale of backward learning phase
@@ -615,12 +615,12 @@ class phased_noise_model(base_model):
 		elif self.model == "DTPDRL":
 			if self.pyr_hi_pass:
 				self.dBPP[active_bw_syn] = - self.dt * self.eta_bw[active_bw_syn] * np.outer(
-					self.BPP[active_bw_syn]@self.rP_breve_HI[-1]-self.BPI[active_bw_syn]@self.rI_breve[-1]-self.noise[active_bw_syn],
+					self.BPP[active_bw_syn]@self.rP_breve_HI[-1] + self.BPI[active_bw_syn]@self.rI_breve[-1] - self.noise[active_bw_syn],
 					self.rP_breve_HI[-1]
 					)
 			else:
 				self.dBPP[active_bw_syn] = - self.dt * self.eta_bw[active_bw_syn] * np.outer(
-					self.BPP[active_bw_syn]@self.rP_breve[-1]-self.BPI[active_bw_syn]@self.rI_breve[-1]-self.noise[active_bw_syn],
+					self.BPP[active_bw_syn]@self.rP_breve[-1] + self.BPI[active_bw_syn]@self.rI_breve[-1] - self.noise[active_bw_syn],
 					self.rP_breve[-1]
 					)
 			# add regularizer
