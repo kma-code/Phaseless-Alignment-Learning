@@ -34,19 +34,27 @@ def cos_sim(A, B):
 	else:
 		return np.trace(A.T @ B) / np.linalg.norm(A) / np.linalg.norm(B)
 
+def dist(A, B):
+	return np.linalg.norm(A-B)
+		
+
+
 def deepcopy_array(array):
 	""" makes a deep copy of an array of np-arrays """
 	out = [nparray.copy() for nparray in array]
 	return out.copy()
 
 def MSE(output, target):
-	return (output - target).mean()
+	return np.linalg.norm(output - target)**2
+
+def moving_average(x, w):
+    return np.convolve(x, np.ones(w), 'valid') / w
 
 
 class base_model:
 	""" This class implements a generic microcircuit model """
 
-	def __init__(self, dt, Tpres, model, activation, d_activation, layers,
+	def __init__(self, dt, Tpres, model, activation, layers,
 					uP_init, uI_init, WPP_init, WIP_init, BPP_init, BPI_init,
 					gl, gden, gbas, gapi, gnI, gntgt,
 					eta_fw, eta_bw, eta_PI, eta_IP):
@@ -62,10 +70,9 @@ class base_model:
 
 		# apply activation layer-wise,
 		# so that we can easily disable it e.g. for last layer
-		self.activation = [activation for layer in layers[1:-1]]
-		self.activation.append(linear)
-		self.d_activation = [d_activation for layer in layers[1:-1]]
-		self.d_activation.append(d_linear)
+		self.activation = [activation for layer in layers[1:]]
+		# self.activation = [activation for layer in layers[1:-1]]
+		# self.activation.append(linear)
 
 
 		# define the compartment voltages
@@ -111,6 +118,57 @@ class base_model:
 		self.rI_breve = [self.activation[-1](self.uI_breve[-1])]
 
 		self.r0 = np.zeros(self.layers[0])
+
+	def init_record(self, rec_per_steps=1, rec_WPP=False, rec_WIP=False, rec_BPP=False, rec_BPI=False,
+		rec_uP=False, rec_rP_breve=False, rec_uI=False, rec_rI_breve=False, rec_vapi=False):
+		# records the values of the variables given in var_array
+		# e.g. WPP, BPP, uP_breve
+		# rec_per_steps sets after how many steps data is recorded
+		#
+		
+		if rec_WPP:
+			self.WPP_time_series = []
+		if rec_WIP:
+			self.WIP_time_series = []
+		if rec_BPP:
+			self.BPP_time_series = []
+		if rec_BPI:
+			self.BPI_time_series = []
+		if rec_uP:
+			self.uP_time_series = []
+		if rec_rP_breve:
+			self.rP_breve_time_series = []
+		if rec_uI:
+			self.uI_time_series = []
+		if rec_rI_breve:
+			self.rI_breve_time_series = []
+		if rec_vapi:
+			self.vapi_time_series = []
+
+		self.rec_per_steps = rec_per_steps
+		self.rec_counter = 0
+
+
+	def record_step(self):
+		if hasattr(self, 'WPP_time_series'):
+			self.WPP_time_series.append(copy.deepcopy(self.WPP))
+		if hasattr(self, 'WIP_time_series'):
+			self.WIP_time_series.append(copy.deepcopy(self.WIP))
+		if hasattr(self, 'BPP_time_series'):
+			self.BPP_time_series.append(copy.deepcopy(self.BPP))
+		if hasattr(self, 'BPI_time_series'):
+			self.BPI_time_series.append(copy.deepcopy(self.BPI))
+		if hasattr(self, 'uP_time_series'):
+			self.uP_time_series.append(copy.deepcopy(self.uP))
+		if hasattr(self, 'rP_breve_time_series'):
+			self.rP_breve_time_series.append(copy.deepcopy(self.rP_breve))
+		if hasattr(self, 'uI_time_series'):
+			self.uI_time_series.append(copy.deepcopy(self.uI))
+		if hasattr(self, 'rI_breve_time_series'):
+			self.rI_breve_time_series.append(copy.deepcopy(self.rI_breve))
+		if hasattr(self, 'vapi_time_series'):
+			self.vapi_time_series.append(copy.deepcopy(self.vapi))
+
 
 	def calc_taueff(self):
 		# calculate tau_eff for pyramidals and interneuron
@@ -242,6 +300,13 @@ class base_model:
 				self.BPP[i] += self.dBPP[i]
 			for i in range(len(self.dBPI)):
 				self.BPI[i] += self.dBPI[i]
+
+		# record step
+		if hasattr(self, 'rec_per_steps'):
+			self.rec_counter += 1
+			if self.rec_counter % self.rec_per_steps == 0:
+				self.rec_counter = 0
+				self.record_step()
 
 
 	def evolve_voltages(self, r0=None, u_tgt=None):
@@ -398,14 +463,15 @@ class base_model:
 
 class phased_noise_model(base_model):
 	""" This class inherits all properties from the base model class and adds the function to add phased noise """
-	def __init__(self, dt, dtxi, tausyn, Tbw, Tpres, noise_scale, alpha, inter_low_pass, pyr_hi_pass, model, activation, d_activation, layers,
+	def __init__(self, dt, dtxi, tausyn, Tbw, Tpres, noise_scale, alpha, inter_low_pass, pyr_hi_pass, dWPP_low_pass, gate_regularizer, noise_mode,
+					model, activation, layers,
 					uP_init, uI_init, WPP_init, WIP_init, BPP_init, BPI_init,
 					gl, gden, gbas, gapi, gnI, gntgt,
 					eta_fw, eta_bw, eta_PI, eta_IP):
 
 		# init base_model with same settings
 		super().__init__(dt=dt, Tpres=Tpres,
-			model=model, activation=activation, d_activation=d_activation, layers=layers,
+			model=model, activation=activation, layers=layers,
             uP_init=uP_init, uI_init=uI_init,
             WPP_init=WPP_init, WIP_init=WIP_init, BPP_init=BPP_init, BPI_init=BPI_init,
             gl=gl, gden=gden, gbas=gbas, gapi=gapi, gnI=gnI, gntgt=gntgt,
@@ -413,9 +479,17 @@ class phased_noise_model(base_model):
 
 		# new variables:
 
+		# mode of noise injection (order vapi or uP)
+		self.noise_mode = noise_mode
+
 		# whether to low-pass filter the interneuron dendritic input
 		self.inter_low_pass = inter_low_pass
+		# whether to high-pass filter rPbreve for updates of BPP
 		self.pyr_hi_pass = pyr_hi_pass
+		# whether to low-pass filter updates of WPP
+		self.dWPP_low_pass = dWPP_low_pass
+		# whether to gate application of the regularizer
+		self.gate_regularizer = gate_regularizer
 		# noise time scale
 		self.dtxi = dtxi
 		# decimals of dt
@@ -439,6 +513,9 @@ class phased_noise_model(base_model):
 		# init a high-pass filtered version of rP_breve
 		self.rP_breve_HI = deepcopy_array(self.rP_breve)
 
+		# init a low-pass filtered version of dWPP
+		self.dWPP_LO = [np.zeros(shape=WPP.shape) for WPP in self.WPP]
+
 		# regularizer for backward weights
 		self.alpha = alpha
 
@@ -452,9 +529,9 @@ class phased_noise_model(base_model):
 
 		# update which backwards weights to learn
 		if learn_bw_weights and self.Time % self.Tbw == 0:
-			print(f"Current time: {self.Time}s")
+			# print(f"Current time: {self.Time}s")
 			self.active_bw_syn = 0 if self.active_bw_syn == len(self.BPP) - 1 else self.active_bw_syn + 1
-			print(f"Learning backward weights to layer {self.active_bw_syn + 1}")
+			# print(f"Learning backward weights to layer {self.active_bw_syn + 1}")
 			self.noise_counter = 0
 
 		# calculate voltage evolution, including low pass on interneuron synapses
@@ -476,8 +553,14 @@ class phased_noise_model(base_model):
 			self.uI [i]+= self.duI[i]
 
 		if learn_weights:
-			for i in range(len(self.dWPP)):
-				self.WPP[i] += self.dWPP[i]
+			if self.dWPP_low_pass:
+				# calculate lo-passed update of WPP
+				self.dWPP_LO = self.calc_dWPP_LO()
+				for i in range(len(self.dWPP_LO)):
+					self.WPP[i] += self.dWPP_LO[i]
+			else:
+				for i in range(len(self.dWPP)):
+					self.WPP[i] += self.dWPP[i]
 			for i in range(len(self.dWIP)):
 				self.WIP[i] += self.dWIP[i]
 			for i in range(len(self.dBPI)):
@@ -485,6 +568,13 @@ class phased_noise_model(base_model):
 		if learn_bw_weights:
 			for i in range(len(self.dBPP)):
 				self.BPP[i] += self.dBPP[i]
+
+		# record step
+		if hasattr(self, 'rec_per_steps'):
+			self.rec_counter += 1
+			if self.rec_counter % self.rec_per_steps == 0:
+				self.rec_counter = 0
+				self.record_step()
 
 		# increase timer
 		self.Time = np.round(self.Time + self.dt, decimals=self.dt_decimals)
@@ -495,7 +585,7 @@ class phased_noise_model(base_model):
 			Overwrites voltage evolution:
 			Evolves the pyramidal and interneuron voltages by one dt
 			using r0 as input rates
-			>> Injects noise into vapi
+			>> Injects noise into vapi or uP
 		"""
 
 		self.duP = [np.zeros(shape=uP.shape) for uP in self.uP]
@@ -546,8 +636,16 @@ class phased_noise_model(base_model):
 		# if dtxi timesteps have passed, sample new noise
 		if np.all(self.noise[layer] == 0) or self.noise_counter % self.noise_total_counts == 0:
 
-			stdev = noise_scale[layer] * np.max(np.abs(self.uP[layer]))
-			self.noise[layer] = np.random.normal(loc=0, scale=stdev, size=self.vapi[layer].shape)
+			# stdev = noise_scale[layer] * np.max(np.abs(self.uP[layer]))
+			# self.noise[layer] = np.random.normal(loc=0, scale=stdev, size=self.vapi[layer].shape)
+
+			if self.noise_mode == 'uP':
+				# add noise with magnitude of rescaled uP
+				self.noise[layer] = noise_scale[layer] * np.array([np.random.normal(0, np.abs(x)) for x in self.uP[layer]])
+			elif self.noise_mode == 'vapi':
+				# add noise with magnitude of rescaled vapi
+				self.noise[layer] = noise_scale[layer] * np.array([np.random.normal(0, np.abs(x)) for x in self.vapi[layer]])
+			
 			self.noise_counter = 0
 
 		self.noise_counter += 1
@@ -565,6 +663,16 @@ class phased_noise_model(base_model):
 		self.rP_breve_HI[-1] += (self.rP_breve[-1] - self.rP_breve_old[-1]) - self.dt / self.tausyn * self.rP_breve_HI[-1]
 
 		return self.rP_breve_HI
+
+
+	def calc_dWPP_LO(self):
+		# updates the low-passed update of WPP
+		# Low-pass has the form d v_out =  dt/tau (v_in - v_out)
+
+		for i in range(len(self.dWPP_LO)):
+		      self.dWPP_LO[i] += self.dt / self.tausyn * (self.dWPP[i] - self.dWPP_LO[i])
+
+		return self.dWPP_LO
 
 
 
@@ -605,12 +713,23 @@ class phased_noise_model(base_model):
 				self.dBPP[active_bw_syn] = self.dt * self.eta_bw[active_bw_syn] * np.outer(
 					self.noise[active_bw_syn], self.rP_breve_HI[-1]
 					)
+				# add regularizer
+				if self.gate_regularizer:
+					self.dBPP[active_bw_syn] -= self.dt * self.alpha[active_bw_syn] * self.eta_bw[active_bw_syn] * self.BPP[active_bw_syn] * np.heaviside(self.rP_breve_HI[-1], 0)
+				else:
+					self.dBPP[active_bw_syn] -= self.dt * self.alpha[active_bw_syn] * self.eta_bw[active_bw_syn] * self.BPP[active_bw_syn]
+
 			else:
 				self.dBPP[active_bw_syn] = self.dt * self.eta_bw[active_bw_syn] * np.outer(
 					self.noise[active_bw_syn], self.rP_breve[-1]
 					)
-			# add regularizer
-			self.dBPP[active_bw_syn] -= self.dt * self.alpha[active_bw_syn] * self.eta_bw[active_bw_syn] * self.BPP[active_bw_syn]
+				# add regularizer
+				if self.gate_regularizer:
+					self.dBPP[active_bw_syn] -= self.dt * self.alpha[active_bw_syn] * self.eta_bw[active_bw_syn] * self.BPP[active_bw_syn] * np.heaviside(self.rP_breve[-1], 0)
+				else:
+					self.dBPP[active_bw_syn] -= self.dt * self.alpha[active_bw_syn] * self.eta_bw[active_bw_syn] * self.BPP[active_bw_syn]
+			
+
 
 		elif self.model == "DTPDRL":
 			if self.pyr_hi_pass:
