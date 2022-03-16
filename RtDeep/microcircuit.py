@@ -68,11 +68,12 @@ class base_model:
 		self.uP_old = deepcopy_array(self.uP)
 		self.uI_old = deepcopy_array(self.uI)
 
-		# apply activation layer-wise,
-		# so that we can easily disable it e.g. for last layer
-		self.activation = [activation for layer in layers[1:]]
-		# self.activation = [activation for layer in layers[1:-1]]
-		# self.activation.append(linear)
+		# if a list of activations has been passed, use it
+		if isinstance(activation, list):
+			self.activation = activation
+		# else, set same activation for all layers
+		else:
+			self.activation = [activation for layer in layers[1:]]
 
 
 		# define the compartment voltages
@@ -119,13 +120,15 @@ class base_model:
 
 		self.r0 = np.zeros(self.layers[0])
 
-	def init_record(self, rec_per_steps=1, rec_WPP=False, rec_WIP=False, rec_BPP=False, rec_BPI=False,
+	def init_record(self, rec_per_steps=1, rec_MSE=False, rec_WPP=False, rec_WIP=False, rec_BPP=False, rec_BPI=False,
 		rec_uP=False, rec_rP_breve=False, rec_uI=False, rec_rI_breve=False, rec_vapi=False):
 		# records the values of the variables given in var_array
 		# e.g. WPP, BPP, uP_breve
 		# rec_per_steps sets after how many steps data is recorded
 		#
 		
+		if rec_MSE:
+			self.MSE_time_series = []
 		if rec_WPP:
 			self.WPP_time_series = []
 		if rec_WIP:
@@ -149,7 +152,11 @@ class base_model:
 		self.rec_counter = 0
 
 
-	def record_step(self):
+	def record_step(self, target=None):
+		if hasattr(self, 'MSE_time_series') and target is not None:
+			self.MSE_time_series.append(
+				MSE(self.uP_breve[-1], target)
+				)
 		if hasattr(self, 'WPP_time_series'):
 			self.WPP_time_series.append(copy.deepcopy(self.WPP))
 		if hasattr(self, 'WIP_time_series'):
@@ -306,7 +313,7 @@ class base_model:
 			self.rec_counter += 1
 			if self.rec_counter % self.rec_per_steps == 0:
 				self.rec_counter = 0
-				self.record_step()
+				self.record_step(target=u_tgt)
 
 
 	def evolve_voltages(self, r0=None, u_tgt=None):
@@ -574,7 +581,7 @@ class phased_noise_model(base_model):
 			self.rec_counter += 1
 			if self.rec_counter % self.rec_per_steps == 0:
 				self.rec_counter = 0
-				self.record_step()
+				self.record_step(target=u_tgt)
 
 		# increase timer
 		self.Time = np.round(self.Time + self.dt, decimals=self.dt_decimals)
