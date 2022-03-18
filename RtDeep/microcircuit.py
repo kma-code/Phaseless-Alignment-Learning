@@ -27,6 +27,13 @@ def d_tanh(x):
     y = tanh(x)
     return 1 - y**2
 
+def hard_sigmoid(x):
+	# see defintion at torch.nn.Hardsigmoid
+	return np.maximum(0, np.minimum(1, x/6 + 1/2), np.array(x))
+
+def d_hard_sigmoid(x):
+	return np.heaviside(x/6 + 1/2, 0) * np.heaviside(1 - (x/6 + 1/2), 0)
+
 # cosine similarity between tensors
 def cos_sim(A, B):
 	if A.ndim == 1 and B.ndim == 1:
@@ -497,6 +504,14 @@ class phased_noise_model(base_model):
 		self.dWPP_low_pass = dWPP_low_pass
 		# whether to gate application of the regularizer
 		self.gate_regularizer = gate_regularizer
+		if self.gate_regularizer:
+			# need to to define the gate, i.e. the derivative of activation
+			self.d_activation = []
+			for activation in self.activation:
+				if activation == relu:
+					self.d_activation.append(d_relu)
+				elif activation == hard_sigmoid:
+					self.d_activation.append(d_hard_sigmoid)
 		# noise time scale
 		self.dtxi = dtxi
 		# decimals of dt
@@ -722,7 +737,8 @@ class phased_noise_model(base_model):
 					)
 				# add regularizer
 				if self.gate_regularizer:
-					self.dBPP[active_bw_syn] -= self.dt * self.alpha[active_bw_syn] * self.eta_bw[active_bw_syn] * self.BPP[active_bw_syn] * np.heaviside(self.rP_breve_HI[-1], 0)
+					self.dBPP[active_bw_syn] -= self.dt * self.alpha[active_bw_syn] * \
+						self.eta_bw[active_bw_syn] * self.BPP[active_bw_syn] * self.d_activation[-1](self.rP_breve_HI[-1])
 				else:
 					self.dBPP[active_bw_syn] -= self.dt * self.alpha[active_bw_syn] * self.eta_bw[active_bw_syn] * self.BPP[active_bw_syn]
 
@@ -732,7 +748,8 @@ class phased_noise_model(base_model):
 					)
 				# add regularizer
 				if self.gate_regularizer:
-					self.dBPP[active_bw_syn] -= self.dt * self.alpha[active_bw_syn] * self.eta_bw[active_bw_syn] * self.BPP[active_bw_syn] * np.heaviside(self.rP_breve[-1], 0)
+					self.dBPP[active_bw_syn] -= self.dt * self.alpha[active_bw_syn] * \
+						self.eta_bw[active_bw_syn] * self.BPP[active_bw_syn] * self.d_activation[-1](self.rP_breve[-1])
 				else:
 					self.dBPP[active_bw_syn] -= self.dt * self.alpha[active_bw_syn] * self.eta_bw[active_bw_syn] * self.BPP[active_bw_syn]
 			
@@ -754,19 +771,6 @@ class phased_noise_model(base_model):
 
 
 		return self.dBPP
-
-
-# low pass filter adapted from user3123955 and Warren Weckesser @ SO
-def butter_lowpass(cutoff, fs, order=5):
-    nyq = 0.5 * fs
-    normal_cutoff = cutoff / nyq
-    b, a = signal.butter(order, normal_cutoff, btype='low', analog=False)
-    return b, a
-
-def butter_lowpass_filter(data, cutoff, fs, order=5):
-    b, a = butter_lowpass(cutoff, fs, order=order)
-    y = signal.filtfilt(b, a, data)
-    return y
 
 
 
