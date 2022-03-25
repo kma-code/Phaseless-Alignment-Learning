@@ -128,7 +128,7 @@ class base_model:
 		self.r0 = np.zeros(self.layers[0])
 
 	def init_record(self, rec_per_steps=1, rec_MSE=False, rec_WPP=False, rec_WIP=False, rec_BPP=False, rec_BPI=False,
-		rec_uP=False, rec_rP_breve=False, rec_uI=False, rec_rI_breve=False, rec_vapi=False):
+		rec_uP=False, rec_rP_breve=False, rec_rP_breve_HI=False, rec_uI=False, rec_rI_breve=False, rec_vapi=False, rec_noise=False):
 		# records the values of the variables given in var_array
 		# e.g. WPP, BPP, uP_breve
 		# rec_per_steps sets after how many steps data is recorded
@@ -148,12 +148,16 @@ class base_model:
 			self.uP_time_series = []
 		if rec_rP_breve:
 			self.rP_breve_time_series = []
+		if rec_rP_breve_HI:
+			self.rP_breve_HI_time_series = []
 		if rec_uI:
 			self.uI_time_series = []
 		if rec_rI_breve:
 			self.rI_breve_time_series = []
 		if rec_vapi:
 			self.vapi_time_series = []
+		if rec_noise:
+			self.noise_time_series = []
 
 		self.rec_per_steps = rec_per_steps
 		self.rec_counter = 0
@@ -176,12 +180,16 @@ class base_model:
 			self.uP_time_series.append(copy.deepcopy(self.uP))
 		if hasattr(self, 'rP_breve_time_series'):
 			self.rP_breve_time_series.append(copy.deepcopy(self.rP_breve))
+		if hasattr(self, 'rP_breve_HI_time_series'):
+			self.rP_breve_HI_time_series.append(copy.deepcopy(self.rP_breve_HI))
 		if hasattr(self, 'uI_time_series'):
 			self.uI_time_series.append(copy.deepcopy(self.uI))
 		if hasattr(self, 'rI_breve_time_series'):
 			self.rI_breve_time_series.append(copy.deepcopy(self.rI_breve))
 		if hasattr(self, 'vapi_time_series'):
 			self.vapi_time_series.append(copy.deepcopy(self.vapi))
+		if hasattr(self, 'noise_time_series'):
+			self.noise_time_series.append(copy.deepcopy(self.noise))
 
 
 	def calc_taueff(self):
@@ -493,8 +501,10 @@ class phased_noise_model(base_model):
 
 		# new variables:
 
-		# mode of noise injection (order vapi or uP)
+		# mode of noise injection (order vapi or uP or uP_adative)
 		self.noise_mode = noise_mode
+		# for uP_adaptive, we need epsilon: measures angle between BPP, WPP.T
+		self.epsilon = [np.float64(1.0) for BPP in self.BPP]
 
 		# whether to low-pass filter the interneuron dendritic input
 		self.inter_low_pass = inter_low_pass
@@ -526,7 +536,11 @@ class phased_noise_model(base_model):
 		# gaussian noise properties
 		self.noise_scale = noise_scale
 		self.noise = [np.zeros(shape=uP.shape) for uP in self.uP]
-		self.noise_breve = [np.zeros(shape=uP.shape) for uP in self.uP]
+		# self.noise_breve = [np.zeros(shape=uP.shape) for uP in self.uP]
+
+		# we need a new variable: vapi after noise has been added
+		# i.e. vapi = BPP rP + BPI rI (as usual), and vapi_noise = vapi + noise
+		self.vapi_noise = deepcopy_array(self.vapi)
 
 		# init a counter for time steps after which to resample noise
 		self.noise_counter = 0
@@ -640,7 +654,38 @@ class phased_noise_model(base_model):
 		# inject noise into newly calculated vapi before calculating update du
 		if inject_noise: self.inject_noise(layer=self.active_bw_syn, noise_scale=self.noise_scale)
 
-		self.duP, self.duI = self.calc_somatic_updates(u_tgt)
+		self.duP, self.duI = self.calc_somatic_updates(u_tgt, inject_noise=inject_noise)
+
+		return self.duP, self.duI
+
+
+	def calc_somatic_updates(self, u_tgt=None, inject_noise=False):
+		"""
+			this overwrites the somatic update rules
+			only difference to super: uses vapi_noise instead of vapi
+
+		"""
+
+		# update somatic potentials
+		ueffI = self.taueffI[-1] * (self.gden * self.vden[-1] + self.gnI * self.uP_breve[-1])
+		delta_uI = (ueffI - self.uI[-1]) / self.taueffI[-1]
+		self.duI[-1] = self.dt * delta_uI
+
+		for i in range(0, len(self.layers)-2):
+			if inject_noise:
+				ueffP = self.taueffP[i] * (self.gbas * self.vbas[i] + self.gapi * self.vapi_noise[i])
+			else:
+				ueffP = self.taueffP[i] * (self.gbas * self.vbas[i] + self.gapi * self.vapi[i])
+			delta_uP = (ueffP - self.uP[i]) / self.taueffP[i]
+			self.duP[i] = self.dt * delta_uP
+
+		if u_tgt is not None:
+			ueffP = self.taueffP[-1] * (self.gbas * self.vbas[-1] + self.gntgt * u_tgt[-1])
+			delta_uP = (ueffP - self.uP[-1]) / self.taueffP[-1]
+		else:
+			ueffP = self.taueffP_notgt[-1] * (self.gbas * self.vbas[-1])
+			delta_uP = (ueffP - self.uP[-1]) / self.taueffP[-1]
+		self.duP[-1] = self.dt * delta_uP
 
 		return self.duP, self.duI
 
@@ -653,15 +698,29 @@ class phased_noise_model(base_model):
 		"""
 
 		# save current noise for noise_breve
-		self.noise_old = deepcopy_array(self.noise)
+		# self.noise_old = deepcopy_array(self.noise)
 
 		# if dtxi timesteps have passed, sample new noise
 		if np.all(self.noise[layer] == 0) or self.noise_counter % self.noise_total_counts == 0:
 
-			# stdev = noise_scale[layer] * np.max(np.abs(self.uP[layer]))
-			# self.noise[layer] = np.random.normal(loc=0, scale=stdev, size=self.vapi[layer].shape)
+			if self.noise_mode == 'uP_adaptive':
+				# if noise is non-zero:
+				if np.linalg.norm(self.noise[layer]) != 0.0 and self.epsilon[0] > 1e-3:
+					# print("calculating epsilon, time:", self.Time)
+					# calculate Jacobian alignment factor epsilon
+					self.epsilon = [(1 - self.noise[layer] @ self.BPP[layer] @ self.rP_breve_HI[-1]  \
+					/ np.linalg.norm(self.noise[layer]) / np.linalg.norm(self.BPP[layer] @ self.rP_breve_HI[-1]))/2]
+					print("eps", self.epsilon)
+					# print("prod:", self.noise[layer] @ self.BPP[layer] @ self.rP_breve_HI[-1])
+					# print("norm:", np.linalg.norm(self.noise[layer]), np.linalg.norm(self.BPP[layer] @ self.rP_breve_HI[-1]))
+					print("cos:", 1-self.epsilon[0])
+					print("actual cos:", cos_sim(self.BPP[0], self.WPP[-1].T))
 
-			if self.noise_mode == 'uP':
+				# generate noise, rescaled with epsilon	
+				self.noise[layer] = noise_scale[layer] * self.epsilon[layer] * np.array([np.random.normal(0, np.abs(x)) for x in self.uP[layer]])
+				print("noise", self.noise)
+
+			elif self.noise_mode == 'uP':
 				# add noise with magnitude of rescaled uP
 				self.noise[layer] = noise_scale[layer] * np.array([np.random.normal(0, np.abs(x)) for x in self.uP[layer]])
 			elif self.noise_mode == 'vapi':
@@ -672,8 +731,8 @@ class phased_noise_model(base_model):
 
 		self.noise_counter += 1
 
-		self.vapi[layer] += self.noise[layer]
-		self.noise_breve[layer] = self.prospective_voltage(self.noise[layer], self.noise_old[layer], self.taueffP[layer])
+		self.vapi_noise[layer] = self.vapi[layer] + self.noise[layer]
+		# self.noise_breve[layer] = self.prospective_voltage(self.noise[layer], self.noise_old[layer], self.taueffP[layer])
 
 	def calc_rP_breve_HI(self):
 		# updates the high-passed instantaneous rate rP_breve_HI which is used to update BPP
@@ -757,8 +816,12 @@ class phased_noise_model(base_model):
 
 		elif self.model == "DTPDRL":
 			if self.pyr_hi_pass:
+				# self.dBPP[active_bw_syn] = - self.dt * self.eta_bw[active_bw_syn] * np.outer(
+				# 	self.BPP[active_bw_syn]@self.rP_breve_HI[-1] + self.BPI[active_bw_syn]@self.rI_breve[-1] - self.noise[active_bw_syn],
+				# 	self.rP_breve_HI[-1]
+				# 	)
 				self.dBPP[active_bw_syn] = - self.dt * self.eta_bw[active_bw_syn] * np.outer(
-					self.BPP[active_bw_syn]@self.rP_breve_HI[-1] + self.BPI[active_bw_syn]@self.rI_breve[-1] - self.noise[active_bw_syn],
+					self.BPP[active_bw_syn] @ self.rP_breve_HI[-1] - self.noise[active_bw_syn],
 					self.rP_breve_HI[-1]
 					)
 			else:
