@@ -43,6 +43,10 @@ def cos_sim(A, B):
 
 def dist(A, B):
 	return np.linalg.norm(A-B)
+
+def deg(cos):
+	# calculates angle in deg from cosine
+	return np.arccos(cos) * 180 / np.pi
 		
 
 
