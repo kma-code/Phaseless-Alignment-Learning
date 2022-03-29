@@ -132,11 +132,11 @@ class base_model:
 		self.r0 = np.zeros(self.layers[0])
 
 	def init_record(self, rec_per_steps=1, rec_MSE=False, rec_WPP=False, rec_WIP=False, rec_BPP=False, rec_BPI=False,
-		rec_uP=False, rec_rP_breve=False, rec_rP_breve_HI=False, rec_uI=False, rec_rI_breve=False, rec_vapi=False, rec_noise=False):
+		rec_uP=False, rec_rP_breve=False, rec_rP_breve_HI=False, rec_uI=False, rec_rI_breve=False, rec_vapi=False, rec_vapi_noise=False, rec_noise=False, rec_epsilon=False, rec_epsilon_LO=False):
 		# records the values of the variables given in var_array
 		# e.g. WPP, BPP, uP_breve
 		# rec_per_steps sets after how many steps data is recorded
-		#
+		
 		
 		if rec_MSE:
 			self.MSE_time_series = []
@@ -160,8 +160,14 @@ class base_model:
 			self.rI_breve_time_series = []
 		if rec_vapi:
 			self.vapi_time_series = []
+		if rec_vapi_noise:
+			self.vapi_noise_time_series = []
 		if rec_noise:
 			self.noise_time_series = []
+		if rec_epsilon:
+			self.epsilon_time_series = []
+		if rec_epsilon_LO:
+			self.epsilon_LO_time_series = []
 
 		self.rec_per_steps = rec_per_steps
 		self.rec_counter = 0
@@ -192,8 +198,14 @@ class base_model:
 			self.rI_breve_time_series.append(copy.deepcopy(self.rI_breve))
 		if hasattr(self, 'vapi_time_series'):
 			self.vapi_time_series.append(copy.deepcopy(self.vapi))
+		if hasattr(self, 'vapi_noise_time_series'):
+			self.vapi_noise_time_series.append(copy.deepcopy(self.vapi_noise))
 		if hasattr(self, 'noise_time_series'):
 			self.noise_time_series.append(copy.deepcopy(self.noise))
+		if hasattr(self, 'epsilon_time_series'):
+			self.epsilon_time_series.append(copy.deepcopy(self.epsilon))
+		if hasattr(self, 'epsilon_LO_time_series'):
+			self.epsilon_LO_time_series.append(copy.deepcopy(self.epsilon_LO))
 
 
 	def calc_taueff(self):
@@ -509,6 +521,8 @@ class phased_noise_model(base_model):
 		self.noise_mode = noise_mode
 		# for uP_adaptive, we need epsilon: measures angle between BPP, WPP.T
 		self.epsilon = [np.float64(1.0) for BPP in self.BPP]
+		# low-pass filtered version of epsilon
+		self.epsilon_LO = deepcopy_array(self.epsilon)
 
 		# whether to low-pass filter the interneuron dendritic input
 		self.inter_low_pass = inter_low_pass
@@ -709,20 +723,27 @@ class phased_noise_model(base_model):
 
 			if self.noise_mode == 'uP_adaptive':
 				# if noise is non-zero:
-				if np.linalg.norm(self.noise[layer]) != 0.0 and self.epsilon[0] > 1e-3:
+				if np.linalg.norm(self.noise[layer]) != 0.0:# and self.epsilon[0] > 1e-5:
+					# TO DO: adapt epsilon for multiple hidden layers
+
 					# print("calculating epsilon, time:", self.Time)
 					# calculate Jacobian alignment factor epsilon
-					self.epsilon = [(1 - self.noise[layer] @ self.BPP[layer] @ self.rP_breve_HI[-1]  \
-					/ np.linalg.norm(self.noise[layer]) / np.linalg.norm(self.BPP[layer] @ self.rP_breve_HI[-1]))/2]
-					print("eps", self.epsilon)
+					self.epsilon = [1/2 * (1 - self.noise[layer] @ self.BPP[layer] @ self.rP_breve_HI[-1]  \
+					/ np.linalg.norm(self.noise[layer]) / np.linalg.norm(self.BPP[layer] @ self.rP_breve_HI[-1]))]
+					# print("eps", self.epsilon)
 					# print("prod:", self.noise[layer] @ self.BPP[layer] @ self.rP_breve_HI[-1])
 					# print("norm:", np.linalg.norm(self.noise[layer]), np.linalg.norm(self.BPP[layer] @ self.rP_breve_HI[-1]))
-					print("cos:", 1-self.epsilon[0])
-					print("actual cos:", cos_sim(self.BPP[0], self.WPP[-1].T))
+					# print("cos:", 1-2*self.epsilon[0])
+					# print("actual cos:", cos_sim(self.BPP[0], np.linalg.pinv(self.WPP[-1])))
+
+				# update low-pass filtered version of epsilon
+				# self.epsilon_LO[layer] += self.dt / self.tausyn * (self.epsilon[layer] - self.epsilon_LO[layer])
+				self.epsilon_LO[layer] += 1/1000 * (self.epsilon[layer] - self.epsilon_LO[layer])
 
 				# generate noise, rescaled with epsilon	
-				self.noise[layer] = noise_scale[layer] * self.epsilon[layer] * np.array([np.random.normal(0, np.abs(x)) for x in self.uP[layer]])
-				print("noise", self.noise)
+				self.noise[layer] = noise_scale[layer] * self.epsilon_LO[layer]**2 * np.array([np.random.normal(0, np.abs(x)) for x in self.uP[layer]])
+				# self.noise[layer] = noise_scale[layer] * np.array([np.random.normal(0, np.abs(x)) for x in self.uP[layer]])
+				# print("noise", self.noise)
 
 			elif self.noise_mode == 'uP':
 				# add noise with magnitude of rescaled uP
