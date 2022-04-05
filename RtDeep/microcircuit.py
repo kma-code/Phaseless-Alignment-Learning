@@ -521,6 +521,9 @@ class phased_noise_model(base_model):
 		self.noise_mode = noise_mode
 		# for uP_adaptive, we need epsilon: measures angle between BPP, WPP.T
 		self.epsilon = [np.float64(1.0) for BPP in self.BPP]
+		if noise_mode == 'dynamic':
+			self.depsilon = [np.float64(0.0) for BPP in self.BPP]
+			self.dBPP = [np.zeros(shape=BPP.shape) for BPP in self.BPP]
 		# low-pass filtered version of epsilon
 		self.epsilon_LO = deepcopy_array(self.epsilon)
 
@@ -714,9 +717,8 @@ class phased_noise_model(base_model):
 			 this function injects noise into a given layer
 			 by adding it to the apical potential
 		"""
-
-		# save current noise for noise_breve
-		# self.noise_old = deepcopy_array(self.noise)
+		
+		# TO DO: adapt epsilon for multiple hidden layers
 
 		# if dtxi timesteps have passed, sample new noise
 		if np.all(self.noise[layer] == 0) or self.noise_counter % self.noise_total_counts == 0:
@@ -724,40 +726,48 @@ class phased_noise_model(base_model):
 			if self.noise_mode == 'uP_adaptive':
 				# if noise is non-zero:
 				if np.linalg.norm(self.noise[layer]) != 0.0:# and self.epsilon[0] > 1e-5:
-					# TO DO: adapt epsilon for multiple hidden layers
 
 					# print("calculating epsilon, time:", self.Time)
 					# calculate Jacobian alignment factor epsilon
 					self.epsilon = [1/2 * (1 - self.noise[layer] @ self.BPP[layer] @ self.rP_breve_HI[-1]  \
 					/ np.linalg.norm(self.noise[layer]) / np.linalg.norm(self.BPP[layer] @ self.rP_breve_HI[-1]))]
-					# print("eps", self.epsilon)
-					# print("prod:", self.noise[layer] @ self.BPP[layer] @ self.rP_breve_HI[-1])
-					# print("norm:", np.linalg.norm(self.noise[layer]), np.linalg.norm(self.BPP[layer] @ self.rP_breve_HI[-1]))
-					# print("cos:", 1-2*self.epsilon[0])
-					# print("actual cos:", cos_sim(self.BPP[0], np.linalg.pinv(self.WPP[-1])))
 
 				# update low-pass filtered version of epsilon
 				# self.epsilon_LO[layer] += self.dt / self.tausyn * (self.epsilon[layer] - self.epsilon_LO[layer])
 				self.epsilon_LO[layer] += 1/1000 * (self.epsilon[layer] - self.epsilon_LO[layer])
 
-				# generate noise, rescaled with epsilon	
-				self.noise[layer] = noise_scale[layer] * self.epsilon_LO[layer]**2 * np.array([np.random.normal(0, np.abs(x)) for x in self.uP[layer]])
-				# self.noise[layer] = noise_scale[layer] * np.array([np.random.normal(0, np.abs(x)) for x in self.uP[layer]])
-				# print("noise", self.noise)
+				# generate noise, rescaled with epsilon
+				self.noise[layer] = noise_scale[layer] * self.epsilon_LO[layer] * np.array([np.random.normal(0, np.abs(x)) for x in self.uP[layer]])
+
+				# if epsilon is below threshold, do not inject noise
+				if self.epsilon_LO[layer] > 1/2 * (1 - np.cos(20 * np.pi/180)): # use 20 deg as threshold
+					self.vapi_noise[layer] = self.vapi[layer] + self.noise[layer]
+				else:
+					self.vapi_noise[layer] = self.vapi[layer]
+
+			elif self.noise_mode == 'dynamic':
+
+				# epsilon follows a diff eq in this case
+				self.depsilon[layer] = self.dt/(1000 * self.dt) * (0.01 * self.vapi[layer] - self.epsilon[layer] + min([0.1, 1e12 * np.linalg.norm(self.dBPP[layer])/self.dt]) * self.uP[layer])
+				self.epsilon[layer] += self.depsilon[layer]
+
+				# generate noise, where epsilon sets the scale
+				self.noise[layer] = np.array([np.random.normal(0, np.abs(x)) for x in self.epsilon[layer]])
+
 
 			elif self.noise_mode == 'uP':
 				# add noise with magnitude of rescaled uP
 				self.noise[layer] = noise_scale[layer] * np.array([np.random.normal(0, np.abs(x)) for x in self.uP[layer]])
+				self.vapi_noise[layer] = self.vapi[layer] + self.noise[layer]
+
 			elif self.noise_mode == 'vapi':
 				# add noise with magnitude of rescaled vapi
 				self.noise[layer] = noise_scale[layer] * np.array([np.random.normal(0, np.abs(x)) for x in self.vapi[layer]])
+				self.vapi_noise[layer] = self.vapi[layer] + self.noise[layer]
 			
 			self.noise_counter = 0
 
 		self.noise_counter += 1
-
-		self.vapi_noise[layer] = self.vapi[layer] + self.noise[layer]
-		# self.noise_breve[layer] = self.prospective_voltage(self.noise[layer], self.noise_old[layer], self.taueffP[layer])
 
 	def calc_rP_breve_HI(self):
 		# updates the high-passed instantaneous rate rP_breve_HI which is used to update BPP
