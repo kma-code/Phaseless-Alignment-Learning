@@ -38,8 +38,7 @@ class no_inter_model(phased_noise_model):
 	def evolve_system(self, r0=None, u_tgt=None, learn_weights=True, learn_bw_weights=True):
 
 		""" 
-			This overwrites the vanilla system evolution and implements
-			phased noise
+			This takes the phased_noise model and skips all calculations for interneurons
 		"""
 
 		# update which backwards weights to learn
@@ -91,10 +90,7 @@ class no_inter_model(phased_noise_model):
 
 	def evolve_voltages(self, r0=None, u_tgt=None, inject_noise=False):
 		""" 
-			Overwrites voltage evolution:
-			Evolves the pyramidal and interneuron voltages by one dt
-			using r0 as input rates
-			>> Injects noise into vapi or uP
+			This takes the phased_noise model and skips all calculations for interneurons
 		"""
 
 		self.duP = [np.zeros(shape=uP.shape) for uP in self.uP]
