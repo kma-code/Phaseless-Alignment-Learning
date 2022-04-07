@@ -505,7 +505,7 @@ class phased_noise_model(base_model):
 					model, activation, layers,
 					uP_init, uI_init, WPP_init, WIP_init, BPP_init, BPI_init,
 					gl, gden, gbas, gapi, gnI, gntgt,
-					eta_fw, eta_bw, eta_PI, eta_IP):
+					eta_fw, eta_bw, eta_PI, eta_IP, **kwargs):
 
 		# init base_model with same settings
 		super().__init__(dt=dt, Tpres=Tpres,
@@ -521,6 +521,9 @@ class phased_noise_model(base_model):
 		self.noise_mode = noise_mode
 		# for uP_adaptive, we need epsilon: measures angle between BPP, WPP.T
 		self.epsilon = [np.float64(1.0) for BPP in self.BPP]
+		if noise_mode == 'uP_adaptive':
+			self.noise_deg = kwargs.get('noise_deg')
+			self.tau_eps = kwargs.get('taueps')
 		if noise_mode == 'dynamic':
 			self.depsilon = [np.float64(0.0) for BPP in self.BPP]
 			self.dBPP = [np.zeros(shape=BPP.shape) for BPP in self.BPP]
@@ -724,31 +727,29 @@ class phased_noise_model(base_model):
 		if np.all(self.noise[layer] == 0) or self.noise_counter % self.noise_total_counts == 0:
 
 			if self.noise_mode == 'uP_adaptive':
-				# if noise is non-zero:
-				if np.linalg.norm(self.noise[layer]) != 0.0:# and self.epsilon[0] > 1e-5:
 
-					# print("calculating epsilon, time:", self.Time)
-					# calculate Jacobian alignment factor epsilon
-					self.epsilon = [1/2 * (1 - self.noise[layer] @ self.BPP[layer] @ self.rP_breve_HI[-1]  \
-					/ np.linalg.norm(self.noise[layer]) / np.linalg.norm(self.BPP[layer] @ self.rP_breve_HI[-1]))]
+				# calculate Jacobian alignment factor epsilon
+				self.epsilon = [1/2 * (1 - self.uP_breve[layer] @ self.BPP[layer] @ self.rP_breve[-1]  \
+				/ np.linalg.norm(self.uP_breve[layer]) / np.linalg.norm(self.BPP[layer] @ self.rP_breve[-1]))]
 
-				# update low-pass filtered version of epsilon
-				# self.epsilon_LO[layer] += self.dt / self.tausyn * (self.epsilon[layer] - self.epsilon_LO[layer])
-				self.epsilon_LO[layer] += 1/1000 * (self.epsilon[layer] - self.epsilon_LO[layer])
+				# update low-pass filtered version of epsilon, with filter time-constant Tpres
+				self.epsilon_LO[layer] += self.dt/self.tau_eps * (self.epsilon[layer] - self.epsilon_LO[layer])
 
 				# generate noise, rescaled with epsilon
-				self.noise[layer] = noise_scale[layer] * self.epsilon_LO[layer] * np.array([np.random.normal(0, np.abs(x)) for x in self.uP[layer]])
-
 				# if epsilon is below threshold, do not inject noise
-				if self.epsilon_LO[layer] > 1/2 * (1 - np.cos(20 * np.pi/180)): # use 20 deg as threshold
+				if self.epsilon_LO[layer] > 1/2 * (1 - np.cos(self.noise_deg * np.pi/180)):
+					self.noise[layer] = noise_scale[layer] * self.epsilon_LO[layer] * np.array([np.random.normal(0, np.abs(x)) for x in self.uP[layer]])
 					self.vapi_noise[layer] = self.vapi[layer] + self.noise[layer]
-				else:
-					self.vapi_noise[layer] = self.vapi[layer]
 
+				else:
+					self.noise[layer] = np.zeros(shape=self.uP[layer].shape)
+					self.vapi_noise[layer] = self.vapi[layer]	
+
+				
 			elif self.noise_mode == 'dynamic':
 
 				# epsilon follows a diff eq in this case
-				self.depsilon[layer] = self.dt/(1000 * self.dt) * (0.01 * self.vapi[layer] - self.epsilon[layer] + min([0.1, 1e12 * np.linalg.norm(self.dBPP[layer])/self.dt]) * self.uP[layer])
+				self.depsilon[layer] = 1/self.tau_eps * (0.01 * self.vapi[layer] - self.epsilon[layer] + min([0.1, 1e12 * np.linalg.norm(self.dBPP[layer])/self.dt]) * self.uP[layer])
 				self.epsilon[layer] += self.depsilon[layer]
 
 				# generate noise, where epsilon sets the scale
