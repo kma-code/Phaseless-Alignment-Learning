@@ -856,10 +856,11 @@ class phased_noise_model(base_model):
 				# 	self.BPP[active_bw_syn]@self.rP_breve_HI[-1] + self.BPI[active_bw_syn]@self.rI_breve[-1] - self.noise[active_bw_syn],
 				# 	self.rP_breve_HI[-1]
 				# 	)
-				self.dBPP[active_bw_syn] = - self.dt * self.eta_bw[active_bw_syn] * np.outer(
-					self.BPP[active_bw_syn] @ self.rP_breve_HI[-1] - self.noise[active_bw_syn],
-					self.rP_breve_HI[-1]
-					)
+				if np.linalg.norm(self.noise[active_bw_syn]) != 0.0:
+					self.dBPP[active_bw_syn] = - self.dt * self.eta_bw[active_bw_syn] * np.outer(
+						self.BPP[active_bw_syn] @ self.rP_breve_HI[-1] - self.noise[active_bw_syn],
+						self.rP_breve_HI[-1]
+						)
 			else:
 				self.dBPP[active_bw_syn] = - self.dt * self.eta_bw[active_bw_syn] * np.outer(
 					self.BPP[active_bw_syn]@self.rP_breve[-1] + self.BPI[active_bw_syn]@self.rI_breve[-1] - self.noise[active_bw_syn],
