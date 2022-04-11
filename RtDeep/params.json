@@ -1,0 +1,64 @@
+{
+    "dt": 1e-3,
+    "dtxi": 1e-2,
+    "tausyn": 1e-2,
+    "Tpres": 1,
+    "taueps": 1,
+    "Tbw": 1,
+    "dataset_size": 100,
+    "epochs": 2,
+
+    "layers": [2, 3, 2],
+    "activation": "logistic",
+
+    "model_type": "DTPDRL",
+    "noise_scale": [0.1],
+    "noise_deg": 30,
+    "noise_mode": "uP_adaptive",
+
+    "gl": 0.03,
+    "gbas": 0.1,
+    "gapi": 0.06,
+    "gden": 0.1,
+    "gnI": 0.06,
+    "gntgt": 0.06,
+
+    
+    "eta_fw": [0.0, 0.0],
+    "eta_bw": [2500.0],
+    "eta_IP": [0.0, 0.0],
+    "eta_PI": [200.0], 
+
+    "alpha": [0e-5],
+    "random_seed": [325551, 123333, 333121, 777777],
+
+    "init_in_SPS": true,
+
+    "inter_low_pass": false,
+    "pyr_hi_pass": true,
+    "dWPP_low_pass": false,
+    "gate_regularizer": false,
+
+    "input_signal": "step",
+
+    "rec_per_steps": 1,
+    "rec_MSE": false,
+    "rec_WPP": false,
+    "rec_WIP": false,
+    "rec_BPP": false,
+    "rec_BPI": false,
+    "rec_uP": false,
+    "rec_rP_breve": false,
+    "rec_rP_breve_HI": false,
+    "rec_uI": false,
+    "rec_rI_breve": false,
+    "rec_vapi": false,
+    "rec_vapi_noise": false,
+    "rec_noise": false,
+    "rec_epsilon": false,
+    "rec_epsilon_LO": true
+        
+
+}
+
+
