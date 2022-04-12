@@ -3,7 +3,7 @@ from microcircuit import *
 #import time
 import logging
 import matplotlib.pyplot as plt
-plt.rc('text', usetex=True)
+plt.rcParams['text.usetex'] = True
 plt.rc('font', size=12,family='serif')
 import matplotlib.gridspec as gridspec
 from matplotlib.ticker import FormatStrFormatter
@@ -32,6 +32,7 @@ def plot(MC_list):
 		plt.title("$\\epsilon_\\mathrm{LO}$ layer 1")
 		plt.grid()
 		plt.ylim(0,1)
+		plt.xlabel(str(MC_list[0].rec_per_steps) + ' dt')
 		plt.savefig('epsilon_LO.png', dpi=200) 
 
 		fig = plt.figure()
@@ -46,6 +47,7 @@ def plot(MC_list):
 		plt.legend()
 		plt.grid()
 		plt.ylim(-1.1,1.1)
+		plt.xlabel(str(MC_list[0].rec_per_steps) + ' dt')
 		plt.savefig('cos.png', dpi=200) 
 
 
