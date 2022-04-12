@@ -3,7 +3,7 @@
 # %matplotlib widget
 
 import numpy as np
-import pylab as plt
+import matplotlib.pyplot as plt
 
 from microcircuit import *
 import src.init_MC as init_MC

@@ -2,7 +2,7 @@ import numpy as np
 from microcircuit import *
 #import time
 import logging
-import pylab as plt
+import matplotlib.pyplot as plt
 plt.rc('text', usetex=True)
 plt.rc('font', size=12,family='serif')
 import matplotlib.gridspec as gridspec
