@@ -31,5 +31,6 @@ To load and re-plot a saved model, run `python runner.py --params run01/params.j
 Some tips:
 - time parameters (`dt, dtxi, tausyn, Tpres, taueps, Tbw`) are defined in milliseconds.
 - *seeds* in `params.json` is an array of numpy random seeds (not a number of seeds)
+- *input_signal* in `params.json` defines the signal fed into teacher and students. Currently implemented options: `step`
 - setting *rec_per_steps* to anything below 1/dt (standard: 1000) slows down training and generates large .pkl files
 - recording too many variables slows down training significantly
