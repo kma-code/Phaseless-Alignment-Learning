@@ -34,3 +34,7 @@ Some tips:
 - *input_signal* in `params.json` defines the signal fed into teacher and students. Currently implemented options: `step`
 - setting *rec_per_steps* to anything below 1/dt (standard: 1000) slows down training and generates large .pkl files
 - recording too many variables slows down training significantly
+
+Data is recorded in lists such as `uP_breve_time_series`. Every class object (i.e. every microcircuit model) saves its own time series, which can be called with `mc1.uP_breve_time_series`. Every time series has the index structure `uP_breve_time_series[recorded time step][layer][neuron]` for voltages and rates; weight time series are of the form `WPP_breve_time_series[recorded time step][layer][weight]`.
+
+Keep in mind that the `layer` variable always starts from zero. So e.g. for the interneuron recordings, `uI_time_series[-1][0][1]` returns the voltage of the second neuron in the final (and only layer) of interneurons at the end of training.
