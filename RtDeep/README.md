@@ -38,3 +38,13 @@ Some tips:
 Data is recorded in lists such as `uP_breve_time_series`. Every class object (i.e. every microcircuit model) saves its own time series, which can be called with `mc1.uP_breve_time_series`. Every time series has the index structure `uP_breve_time_series[recorded time step][layer][neuron]` for voltages and rates; weight time series are of the form `WPP_breve_time_series[recorded time step][layer][weight]`.
 
 Keep in mind that the `layer` variable always starts from zero. So e.g. for the interneuron recordings, `uI_time_series[-1][0][1]` returns the voltage of the second neuron in the final (and only layer) of interneurons at the end of training.
+
+To load a saved .pkl file in an interactive Python session, go to the folder where `runner.py` is located, run `python`.
+
+```
+import src.save_exp
+import pickle
+with open('run03_teacher/model.pkl', 'rb') as f: input = pickle.load(f)
+```
+where `input[0]` represents the teacher model if it was initiated and other elements are student networks.
+
