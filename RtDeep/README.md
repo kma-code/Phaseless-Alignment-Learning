@@ -29,6 +29,7 @@ While I have implemented multiprocessing in the standalone script, everything st
 To load and re-plot a saved model, run `python runner.py --params run01/params.json --task bw_only --load run01/model.pkl`.
 
 Some tips:
+- currently implemented models are `BP`, `FA` and `DTPDRL`
 - time parameters (`dt, dtxi, tausyn, Tpres, taueps, Tbw`) are defined in milliseconds.
 - *seeds* in `params.json` is an array of numpy random seeds (not a number of seeds)
 - *input_signal* in `params.json` defines the signal fed into teacher and students. Currently implemented options: `step`
