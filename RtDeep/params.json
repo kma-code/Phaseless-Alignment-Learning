@@ -1,21 +1,26 @@
 {
-    "_comment": "all variables below are milliseconds",
-    "dt": 1e-3,
+    "_comment": "GENERAL NOTE: optional arguments should be left in, as the runner does not check whether a param is required for a model and may cause an interrupt.",
+
+    "_comment": "all times below are in milliseconds",
+    "dt": 1e-2,
+    "Tpres": 1,
+    "_comment": "below only relevant for DTPDRL",
     "dtxi": 1e-2,
     "tausyn": 1e-2,
-    "Tpres": 1,
     "taueps": 1,
     "Tbw": 1,
-    "dataset_size": 10,
-    "epochs": 1,
 
-    "layers": [2, 3, 2],
+    "_comment": "dataset_size: how many samples to present",
+    "dataset_size": 100,
+    "epochs": 100,
 
-    "_comment": "implemented activations: logistic, hard_sigmoid, relu, linear, tanh",
-    "activation": "logistic",
+    "layers": [1, 1, 1],
 
-    "_comment": "implemented models: BP, FA, DTPDRL:",
-    "model_type": "BP",
+    "_comment": "implemented activations: logistic, hard_sigmoid, relu, soft_relu, linear, tanh",
+    "activation": "soft_relu",
+
+    "_comment": "implemented models: BP, FA, DTPDRL",
+    "model_type": "FA",
 
     "_comment": "DTPDRL-only: sampled noise is rescaled by noise_scale",
     "noise_scale": [0.1, 0.1],
@@ -33,17 +38,17 @@
     "gntgt": 0.06,
 
     
-    "eta_fw": [200, 100],
-    "eta_bw": [2500],
-    "eta_IP": [100],
-    "eta_PI": [200],
+    "eta_fw": [50, 10],
+    "eta_bw": [0],
+    "eta_IP": [20],
+    "eta_PI": [0],
 
-    "_comment": "weights are initialised as numpy.random.uniform with range defined below",
-    "init_WPP_range": [1, 1],
-    "init_WIP_range": [1, 1],
+    "_comment": "weights are initialised as numpy.random.uniform with range defined below. WIP and BPI are overridden by init_in_SPS=True",
+    "init_WPP_range": [-1, 1],
+    "init_WIP_range": [-1, 1],
     "_comment": "FA and DTPDRL-only: range of BPP",
-    "init_BPP_range": [-1, -1],
-    "init_BPI_range": [-1, -1],
+    "init_BPP_range": [-1, 1],
+    "init_BPI_range": [-1, 1],
 
     "_comment": "DTPDRL-only: alpha is the scaling factor of the regularizer",
     "alpha": [0e-5, 0],
@@ -66,24 +71,24 @@
     "_comment": "input signal, possibilites: step",
     "input_signal": "step",
 
-    "rec_per_steps": 1,
+    "rec_per_steps": 100,
     "rec_MSE": true,
     "rec_WPP": true,
     "rec_WIP": true,
-    "rec_BPP": true,
-    "rec_BPI": true,
-    "rec_uP": true,
-    "rec_uP_breve": true,
-    "rec_rP_breve": true,
-    "rec_rP_breve_HI": true,
-    "rec_uI": true,
-    "rec_uI_breve": true,
-    "rec_rI_breve": true,
-    "rec_vapi": true,
-    "rec_vapi_noise": true,
-    "rec_noise": true,
-    "rec_epsilon": true,
-    "rec_epsilon_LO": true
+    "rec_BPP": false,
+    "rec_BPI": false,
+    "rec_uP": false,
+    "rec_uP_breve": false,
+    "rec_rP_breve": false,
+    "rec_rP_breve_HI": false,
+    "rec_uI": false,
+    "rec_uI_breve": false,
+    "rec_rI_breve": false,
+    "rec_vapi": false,
+    "rec_vapi_noise": false,
+    "rec_noise": false,
+    "rec_epsilon": false,
+    "rec_epsilon_LO": false
 
 }
 

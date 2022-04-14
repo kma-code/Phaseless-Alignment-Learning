@@ -5,6 +5,7 @@ from microcircuit import *
 function_mappings = {
 	'linear': linear,
     'relu': relu,
+    'soft_relu': soft_relu,
     'logistic': logistic,
     'tanh': tanh,
    	'hard_sigmoid': hard_sigmoid

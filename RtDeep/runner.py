@@ -120,7 +120,10 @@ def main(params, task='fw_bw', seeds=[667], load=None):
 
 	logging.info(f'Plotting results')
 	# plot.
-	plot_exp.plot(MC_list, path=PATH)
+	if task == 'fw_bw':
+		plot_exp.plot(MC_list, MC_teacher, path=PATH)
+	else:
+		plot_exp.plot(MC_list, path=PATH)
 
 
 	t_diff = time.time() - t_start

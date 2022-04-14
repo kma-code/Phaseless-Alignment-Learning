@@ -12,7 +12,9 @@ from matplotlib.ticker import FormatStrFormatter
 logging.basicConfig(format='Train model -- %(levelname)s: %(message)s',
                     level=logging.INFO)
 
-def plot(MC_list, path=None):
+def plot(MC_list, MC_teacher=None, path=None):
+
+	# define a variable for path of output files
 	if path is not None:
 		PATH = path + '/'
 	else:
@@ -24,6 +26,8 @@ def plot(MC_list, path=None):
 
 	# colors for plotting
 	color = cm.rainbow(np.linspace(0, 1, len(MC_list)))
+	# color of teacher
+	CLR_TEACH = 'k'
 
 	if MC_list[0].rec_MSE:
 
@@ -44,6 +48,8 @@ def plot(MC_list, path=None):
 			for mc, c in zip(MC_list, color):
 				for j in range(len(mc.WPP_time_series[0][i])):
 					plt.plot(np.array([vec[i][j] for vec in mc.WPP_time_series[TPRE:]]), c=c)
+			if MC_teacher is not None:
+				plt.plot(np.array([MC_teacher[0].WPP[i][j] for vec in MC_list[0].WPP_time_series[TPRE:]]), c=CLR_TEACH, ls='--')
 			plt.title("$W^\\mathrm{PP}$ layer " + str(i+1))
 			# plt.grid()
 			# plt.ylim(0,1)
@@ -58,6 +64,8 @@ def plot(MC_list, path=None):
 			for mc, c in zip(MC_list, color):
 				for j in range(len(mc.WIP_time_series[0][i])):
 					plt.plot(np.array([vec[i][j] for vec in mc.WIP_time_series[TPRE:]]), c=c)
+			if MC_teacher is not None:
+				plt.plot(np.array([MC_teacher[0].WIP[i][j] for vec in MC_list[0].WIP_time_series[TPRE:]]), c=CLR_TEACH, ls='--')
 			plt.title("$W^\\mathrm{IP}$ layer " + str(i+1))
 			# plt.grid()
 			# plt.ylim(0,1)
@@ -72,6 +80,8 @@ def plot(MC_list, path=None):
 			for mc, c in zip(MC_list, color):
 				for j in range(len(mc.BPP_time_series[0][i])):
 					plt.plot(np.array([vec[i][j] for vec in mc.BPP_time_series[TPRE:]]), c=c)
+			if MC_teacher is not None:
+				plt.plot(np.array([MC_teacher[0].BPP[i][j] for vec in MC_list[0].BPP_time_series[TPRE:]]), c=CLR_TEACH, ls='--')
 			plt.title("$B^\\mathrm{PP}$ layer " + str(i+1))
 			# plt.grid()
 			# plt.ylim(0,1)
@@ -86,6 +96,8 @@ def plot(MC_list, path=None):
 			for mc, c in zip(MC_list, color):
 				for j in range(len(mc.BPI_time_series[0][i])):
 					plt.plot(np.array([vec[i][j] for vec in mc.BPI_time_series[TPRE:]]), c=c)
+			if MC_teacher is not None:
+				plt.plot(np.array([MC_teacher[0].BPI[i][j] for vec in MC_list[0].BPI_time_series[TPRE:]]), c=CLR_TEACH, ls='--')
 			plt.title("$B^\\mathrm{PI}$ layer " + str(i+1))
 			# plt.grid()
 			# plt.ylim(0,1)
