@@ -15,6 +15,9 @@ def relu(x):
 def d_relu(x):
     return np.heaviside(x, 0)
 
+def soft_relu(x):
+	return np.log(1 + np.exp(x))
+
 def logistic(x):
     return 1/(1 + np.exp(-x))
 def d_logistic(x):
