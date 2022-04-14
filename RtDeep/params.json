@@ -1,4 +1,5 @@
 {
+    "_comment": "all variables below are milliseconds",
     "dt": 1e-3,
     "dtxi": 1e-2,
     "tausyn": 1e-2,
@@ -9,11 +10,19 @@
     "epochs": 1,
 
     "layers": [2, 3, 2],
+
+    "_comment": "implemented activations: logistic, hard_sigmoid, relu, linear, tanh",
     "activation": "logistic",
 
-    "model_type": "DTPDRL",
-    "noise_scale": [0.1],
+    "_comment": "implemented models: BP, FA, DTPDRL:",
+    "model_type": "BP",
+
+    "_comment": "DTPDRL-only: sampled noise is rescaled by noise_scale",
+    "noise_scale": [0.1, 0.1],
+    "_comment": "DTPDRL and uP_adaptive-only: noise_deg is the angle of alignment between uP_breve_i and BPP_iL * rP_breve_L below which no noise is injected",
+    "_comment": "                             i.e. we are satisfied with this amount of alignment",
     "noise_deg": 30,
+    "_comment": "DTPDRL-only: implemented modes: uP (scale noise with uP), vapi (scale noise with vapi) and uP_adaptive (scale noise with uP and angle of alignment)",
     "noise_mode": "uP_adaptive",
 
     "gl": 0.03,
@@ -24,40 +33,57 @@
     "gntgt": 0.06,
 
     
-    "eta_fw": [0.0, 0.0],
-    "eta_bw": [2500.0],
-    "eta_IP": [0.0, 0.0],
-    "eta_PI": [200.0], 
+    "eta_fw": [200, 100],
+    "eta_bw": [2500],
+    "eta_IP": [100],
+    "eta_PI": [200],
 
-    "alpha": [0e-5],
-    "random_seed": [325551, 123333, 333121, 777777],
+    "_comment": "weights are initialised as numpy.random.uniform with range defined below",
+    "init_WPP_range": [1, 1],
+    "init_WIP_range": [1, 1],
+    "_comment": "FA and DTPDRL-only: range of BPP",
+    "init_BPP_range": [-1, -1],
+    "init_BPI_range": [-1, -1],
 
+    "_comment": "DTPDRL-only: alpha is the scaling factor of the regularizer",
+    "alpha": [0e-5, 0],
+
+    "_comment": "array of seeds",
+    "random_seed": [325551, 333333, 111111],
+
+    "_comment": "whether to set *the* self-predicting state during initialisation",
     "init_in_SPS": true,
 
+    "_comment": "DTPDRL-only: low-pass on interneuron",
     "inter_low_pass": false,
+    "_comment": "DTPDRL-only: high-pass on output layer pyramidal neurons",
     "pyr_hi_pass": true,
+    "_comment": "DTPDRL-only: low-pass on updates of WPP",
     "dWPP_low_pass": false,
+    "_comment": "DTPDRL-only: whether to apply regularizer only if rP_breve > 0",
     "gate_regularizer": false,
 
+    "_comment": "input signal, possibilites: step",
     "input_signal": "step",
 
     "rec_per_steps": 1,
-    "rec_MSE": false,
+    "rec_MSE": true,
     "rec_WPP": true,
     "rec_WIP": true,
     "rec_BPP": true,
     "rec_BPI": true,
     "rec_uP": true,
+    "rec_uP_breve": true,
     "rec_rP_breve": true,
     "rec_rP_breve_HI": true,
     "rec_uI": true,
+    "rec_uI_breve": true,
     "rec_rI_breve": true,
     "rec_vapi": true,
     "rec_vapi_noise": true,
     "rec_noise": true,
     "rec_epsilon": true,
     "rec_epsilon_LO": true
-        
 
 }
 

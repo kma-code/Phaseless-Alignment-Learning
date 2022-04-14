@@ -8,7 +8,7 @@ logging.basicConfig(format='Train model -- %(levelname)s: %(message)s',
 
 # takes a microcircuit object and runs it based on the signal given
 
-def run(mc):
+def run(mc, learn=True):
 	t_start = time.time()
 
 	logging.info(f"Seed {mc.seed}: initialising recording")
@@ -19,8 +19,10 @@ def run(mc):
 		rec_WIP=mc.rec_WIP,
 		rec_BPP=mc.rec_BPP,
 		rec_BPI=mc.rec_BPI,
-		rec_uP=mc.rec_rI_breve,
-		rec_uI=mc.rec_rI_breve,
+		rec_uP=mc.rec_uP,
+		rec_uI=mc.rec_uI,
+		rec_uP_breve=mc.rec_uP_breve,
+		rec_uI_breve=mc.rec_uI_breve,
 		rec_rI_breve=mc.rec_rI_breve,
 		rec_rP_breve=mc.rec_rP_breve,
 		rec_rP_breve_HI=mc.rec_rP_breve_HI,
@@ -34,7 +36,7 @@ def run(mc):
 	pre_training(mc, r0=mc.input, time=mc.Tpres/mc.dt)
 
 	logging.info(f"Seed {mc.seed}: running training")
-	training(mc, r0=mc.input, epochs=mc.epochs)
+	training(mc, r0=mc.input, epochs=mc.epochs, learn=learn)
 
 	t_diff = time.time() - t_start
 	logging.info(f"Seed {mc.seed}: done in {t_diff}s.")
@@ -50,12 +52,16 @@ def pre_training(mc, r0, time=None):
 	for i in range(int(time)):
 		mc.evolve_system(r0=r0[i], learn_weights=False, learn_bw_weights=False)
 
-def training(mc, r0, epochs=1):
+def training(mc, r0, epochs=1, learn=True):
 
 	for n in range(epochs):
 		logging.info(f"Seed {mc.seed}: working on epoch {n}")
 		for data in r0:
-			mc.evolve_system(r0=data, learn_weights=True, learn_bw_weights=True)
+			# if target has been defined
+			if hasattr(mc, 'target'):
+				mc.evolve_system(r0=data, u_tgt=[mc.target[n]], learn_weights=learn, learn_bw_weights=learn)
+			else:
+				mc.evolve_system(r0=data, learn_weights=learn, learn_bw_weights=learn)
 
 
 

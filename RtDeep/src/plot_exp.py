@@ -18,9 +18,9 @@ def plot(MC_list, path=None):
 	else:
 		PATH = ''
 
-	# define the number of time steps which belong to the pre-training
+	# define the number of recorded time steps which belong to the pre-training
 	# and therefore should be skipped in plotting
-	TPRE = int(MC_list[0].Tpres / MC_list[0].dt)
+	TPRE = int(MC_list[0].Tpres / MC_list[0].dt / MC_list[0].rec_per_steps)
 
 	# colors for plotting
 	color = cm.rainbow(np.linspace(0, 1, len(MC_list)))
@@ -29,7 +29,7 @@ def plot(MC_list, path=None):
 
 		fig = plt.figure()
 		for mc, c in zip(MC_list, color):
-			plt.plot(mc.MSE_time_series[TPRE:], c=c)
+			plt.plot(mc.MSE_time_series, c=c)
 
 		plt.title("MSE")
 		plt.yscale('log')

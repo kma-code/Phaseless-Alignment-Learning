@@ -17,6 +17,4 @@ def save(MC_list, name='model', path=None):
 
 def load(file='model.pkl'):
 	with open(file, 'rb') as input:
-	    MC_list = pickle.load(input)
-
-	return MC_list
+		return pickle.load(input)
