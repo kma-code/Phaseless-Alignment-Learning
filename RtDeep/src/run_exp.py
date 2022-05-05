@@ -33,10 +33,10 @@ def run(mc, learn=True):
 		rec_epsilon_LO=mc.rec_epsilon_LO)
 
 	logging.info(f"Seed {mc.seed}: running pre-training")
-	pre_training(mc, r0=mc.input, time=mc.Tpres/mc.dt)
+	mc = pre_training(mc, r0=mc.input, time=mc.settling_time/mc.dt)
 
 	logging.info(f"Seed {mc.seed}: running training")
-	training(mc, r0=mc.input, epochs=mc.epochs, learn=learn)
+	mc = training(mc, r0=mc.input, epochs=mc.epochs, learn=learn)
 
 	t_diff = time.time() - t_start
 	logging.info(f"Seed {mc.seed}: done in {t_diff}s.")
@@ -47,10 +47,12 @@ def run(mc, learn=True):
 def pre_training(mc, r0, time=None):
 
 	if time == None:
-		time = mc.Tpres / mc.dt
+		time = mc.settling_time / mc.dt
 	# pre-training to settle voltages -- if we don't do this, weights learn incorrectly due to the incorrect voltages in the beginning
 	for i in range(int(time)):
 		mc.evolve_system(r0=r0[i], learn_weights=False, learn_bw_weights=False)
+
+	return mc
 
 def training(mc, r0, epochs=1, learn=True):
 
@@ -62,6 +64,7 @@ def training(mc, r0, epochs=1, learn=True):
 				mc.evolve_system(r0=data, u_tgt=[mc.target[n]], learn_weights=learn, learn_bw_weights=learn)
 			else:
 				mc.evolve_system(r0=data, learn_weights=learn, learn_bw_weights=learn)
+	return mc
 
 
 

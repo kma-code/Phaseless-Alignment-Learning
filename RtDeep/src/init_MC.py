@@ -159,6 +159,9 @@ def init_MC(params, seeds, teacher=False):
 		# save seed of mc and other params
 		MC_list[-1].seed = seed
 		MC_list[-1].dataset_size = params["dataset_size"]
+		MC_list[-1].settling_time = params["settling_time"]
+		MC_list[-1].copy_teacher_weights = params["copy_teacher_weights"]
+		MC_list[-1].copy_teacher_voltages = params["copy_teacher_voltages"]
 		if teacher:
 			MC_list[-1].epochs = 1
 		else:

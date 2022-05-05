@@ -20,7 +20,7 @@ import json
 import multiprocess as mp
 import time
 
-N_PROCESSES = 12 # defined by compute setup
+N_MAX_PROCESSES = 12 # defined by compute setup
 
 
 logging.basicConfig(format='Train model -- %(levelname)s: %(message)s',
@@ -66,12 +66,6 @@ def main(params, task='fw_bw', seeds=[667], load=None):
 
 			MC_teacher = init_signals.init_r0(MC_list=MC_teacher, form=params["input_signal"])
 
-		logging.debug(f"Current state of networks:")
-		for mc in MC_list:
-			logging.debug(f"Voltages: {mc.uP}, {mc.uI}")
-			logging.debug(f"Weights: {mc.WPP}, {mc.WIP}, {mc.BPP}, {mc.BPI}")
-			logging.debug(f"Input: {mc.input}")
-
 		logging.info(f'Model: {params["model_type"]}')
 		logging.info(f'Task: {task}')
 
@@ -84,16 +78,23 @@ def main(params, task='fw_bw', seeds=[667], load=None):
 
 			for mc in MC_list:
 				mc.target = [vec[-1] for vec in MC_teacher[0].uP_breve_time_series]
+				
+				if mc.copy_teacher_weights:
+					logging.info(f'Copying teacher weights')
+					mc.set_weights(model=MC_teacher[0])
+				if mc.copy_teacher_weights:
+					logging.info(f'Copying teacher voltages')
+					mc.set_voltages(model=MC_teacher[0])
 
-		# setup multiprocessing
-		# one process for every initialised mc
-		if N_PROCESSES == 1:
-			logging.info(f'Number of processes set to {N_PROCESSES}. Why? I mean, you could use 4. Or 16. But whatever, I\'ll go ahead.')
+		logging.debug(f"Current state of networks:")
+		for mc in MC_list:
+			logging.debug(f"Voltages: {mc.uP}, {mc.uI}")
+			logging.debug(f"Weights: {mc.WPP}, {mc.WIP}, {mc.BPP}, {mc.BPI}")
+			logging.debug(f"Input: {mc.input}")
+
+		N_PROCESSES = len(MC_list) if N_MAX_PROCESSES > len(MC_list) else N_MAX_PROCESSES
 
 		logging.info(f'Setting up and running {N_PROCESSES} processes')
-
-		if N_PROCESSES == 1:
-			logging.info(f'This is going to take an awfully long time because user defined {N_PROCESSES} processes.')
 
 		with mp.Pool(N_PROCESSES) as pool:
 			MC_list = pool.map(run_exp.run, MC_list)
