@@ -8,7 +8,7 @@ logging.basicConfig(format='Train model -- %(levelname)s: %(message)s',
 
 # takes a microcircuit object and runs it based on the signal given
 
-def run(mc, learn=True):
+def run(mc, learn=True, teacher=False):
 	t_start = time.time()
 
 	logging.info(f"Seed {mc.seed}: initialising recording")
@@ -32,11 +32,15 @@ def run(mc, learn=True):
 		rec_noise=mc.rec_noise,
 		rec_epsilon_LO=mc.rec_epsilon_LO)
 
+	# if the mc is the teacher, record target signal
+	if teacher:
+		mc.target = []
+
 	logging.info(f"Seed {mc.seed}: running pre-training")
-	mc = pre_training(mc, r0=mc.input, time=mc.settling_time/mc.dt)
+	mc = pre_training(mc, r0_arr=mc.input, time=mc.settling_time/mc.dt)
 
 	logging.info(f"Seed {mc.seed}: running training")
-	mc = training(mc, r0=mc.input, epochs=mc.epochs, learn=learn)
+	mc = training(mc, r0_arr=mc.input, epochs=mc.epochs, learn=learn, teacher=teacher)
 
 	t_diff = time.time() - t_start
 	logging.info(f"Seed {mc.seed}: done in {t_diff}s.")
@@ -44,26 +48,30 @@ def run(mc, learn=True):
 	return mc
 
 
-def pre_training(mc, r0, time=None):
+def pre_training(mc, r0_arr, time=None):
 
 	if time == None:
 		time = mc.settling_time / mc.dt
 	# pre-training to settle voltages -- if we don't do this, weights learn incorrectly due to the incorrect voltages in the beginning
 	for i in range(int(time)):
-		mc.evolve_system(r0=r0[i], learn_weights=False, learn_bw_weights=False)
+		mc.evolve_system(r0=r0_arr[i], learn_weights=False, learn_bw_weights=False)
 
 	return mc
 
-def training(mc, r0, epochs=1, learn=True):
+def training(mc, r0_arr, epochs=1, learn=True, teacher=False):
 
 	for n in range(epochs):
 		logging.info(f"Seed {mc.seed}: working on epoch {n}")
-		for data in r0:
-			# if target has been defined
-			if hasattr(mc, 'target'):
-				mc.evolve_system(r0=data, u_tgt=[mc.target[n]], learn_weights=learn, learn_bw_weights=learn)
+		for i in range(len(r0_arr)):
+			# if mc is teacher, evolve and record
+			if teacher:
+				mc.target.append(copy.deepcopy(mc.uP_breve[-1]))
+				mc.evolve_system(r0=r0_arr[i], learn_weights=learn, learn_bw_weights=learn)
+			# if target has been defined, use that
+			elif hasattr(mc, 'target'):
+				mc.evolve_system(r0=r0_arr[i], u_tgt=[mc.target[i]], learn_weights=learn, learn_bw_weights=learn)
 			else:
-				mc.evolve_system(r0=data, learn_weights=learn, learn_bw_weights=learn)
+				mc.evolve_system(r0=r0_arr[i], learn_weights=learn, learn_bw_weights=learn)
 	return mc
 
 

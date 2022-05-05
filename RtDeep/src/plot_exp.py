@@ -33,9 +33,9 @@ def plot(MC_list, MC_teacher=None, path=None):
 
 		fig = plt.figure()
 		for mc, c in zip(MC_list, color):
-			plt.plot(mc.MSE_time_series, c=c)
+			plt.plot(moving_average(mc.MSE_time_series, int(10*mc.Tpres/mc.dt/mc.rec_per_steps)), c=c)
 
-		plt.title("MSE")
+		plt.title("MSE (window over $10\\;T_\\mathrm{pres}$)")
 		plt.yscale('log')
 		# plt.legend()
 		plt.savefig(PATH + 'MSE.png', dpi=200)
@@ -48,8 +48,8 @@ def plot(MC_list, MC_teacher=None, path=None):
 			for mc, c in zip(MC_list, color):
 				for j in range(len(mc.WPP_time_series[0][i])):
 					plt.plot(np.array([vec[i][j] for vec in mc.WPP_time_series[TPRE:]]), c=c)
-			if MC_teacher is not None:
-				plt.plot(np.array([MC_teacher[0].WPP[i][j] for vec in MC_list[0].WPP_time_series[TPRE:]]), c=CLR_TEACH, ls='--')
+					if MC_teacher is not None:
+						plt.plot(np.array([MC_teacher[0].WPP[i][j] for vec in MC_list[0].WPP_time_series[TPRE:]]), c=CLR_TEACH, ls='--')
 			plt.title("$W^\\mathrm{PP}$ layer " + str(i+1))
 			# plt.grid()
 			# plt.ylim(0,1)
@@ -64,8 +64,8 @@ def plot(MC_list, MC_teacher=None, path=None):
 			for mc, c in zip(MC_list, color):
 				for j in range(len(mc.WIP_time_series[0][i])):
 					plt.plot(np.array([vec[i][j] for vec in mc.WIP_time_series[TPRE:]]), c=c)
-			if MC_teacher is not None:
-				plt.plot(np.array([MC_teacher[0].WIP[i][j] for vec in MC_list[0].WIP_time_series[TPRE:]]), c=CLR_TEACH, ls='--')
+					if MC_teacher is not None:
+						plt.plot(np.array([MC_teacher[0].WIP[i][j] for vec in MC_list[0].WIP_time_series[TPRE:]]), c=CLR_TEACH, ls='--')
 			plt.title("$W^\\mathrm{IP}$ layer " + str(i+1))
 			# plt.grid()
 			# plt.ylim(0,1)
@@ -80,8 +80,8 @@ def plot(MC_list, MC_teacher=None, path=None):
 			for mc, c in zip(MC_list, color):
 				for j in range(len(mc.BPP_time_series[0][i])):
 					plt.plot(np.array([vec[i][j] for vec in mc.BPP_time_series[TPRE:]]), c=c)
-			if MC_teacher is not None:
-				plt.plot(np.array([MC_teacher[0].BPP[i][j] for vec in MC_list[0].BPP_time_series[TPRE:]]), c=CLR_TEACH, ls='--')
+					if MC_teacher is not None:
+						plt.plot(np.array([MC_teacher[0].BPP[i][j] for vec in MC_list[0].BPP_time_series[TPRE:]]), c=CLR_TEACH, ls='--')
 			plt.title("$B^\\mathrm{PP}$ layer " + str(i+1))
 			# plt.grid()
 			# plt.ylim(0,1)
@@ -96,8 +96,8 @@ def plot(MC_list, MC_teacher=None, path=None):
 			for mc, c in zip(MC_list, color):
 				for j in range(len(mc.BPI_time_series[0][i])):
 					plt.plot(np.array([vec[i][j] for vec in mc.BPI_time_series[TPRE:]]), c=c)
-			if MC_teacher is not None:
-				plt.plot(np.array([MC_teacher[0].BPI[i][j] for vec in MC_list[0].BPI_time_series[TPRE:]]), c=CLR_TEACH, ls='--')
+					if MC_teacher is not None:
+						plt.plot(np.array([MC_teacher[0].BPI[i][j] for vec in MC_list[0].BPI_time_series[TPRE:]]), c=CLR_TEACH, ls='--')
 			plt.title("$B^\\mathrm{PI}$ layer " + str(i+1))
 			# plt.grid()
 			# plt.ylim(0,1)
@@ -114,10 +114,10 @@ def plot(MC_list, MC_teacher=None, path=None):
 			for mc, c in zip(MC_list, color):
 				for j in range(len(mc.uP_time_series[0][i])):
 					plt.plot(np.array([vec[i][j] for vec in mc.uP_time_series[TPRE:]]), c=c)
-			if MC_teacher is not None:
-				data = np.array([vec[i][j] for vec in MC_teacher[0].uP_time_series[TPRE:]])
-				data = np.tile(data, MC_list[0].epochs)
-				plt.plot(data, c=CLR_TEACH, ls='--')
+					if MC_teacher is not None:
+						data = np.array([vec[i][j] for vec in MC_teacher[0].uP_time_series[TPRE:]])
+						data = np.tile(data, MC_list[0].epochs)
+						plt.plot(data, c=CLR_TEACH, ls='--')
 			plt.title("$u^\\mathrm{P}$ layer " + str(i+1))
 			# plt.grid()
 			# plt.ylim(0,1)
@@ -132,10 +132,10 @@ def plot(MC_list, MC_teacher=None, path=None):
 			for mc, c in zip(MC_list, color):
 				for j in range(len(mc.rP_breve_time_series[0][i])):
 					plt.plot(np.array([vec[i][j] for vec in mc.rP_breve_time_series[TPRE:]]), c=c)
-			if MC_teacher is not None:
-				data = np.array([vec[i][j] for vec in MC_teacher[0].rP_breve_time_series[TPRE:]])
-				data = np.tile(data, MC_list[0].epochs)
-				plt.plot(data, c=CLR_TEACH, ls='--')
+					if MC_teacher is not None:
+						data = np.array([vec[i][j] for vec in MC_teacher[0].rP_breve_time_series[TPRE:]])
+						data = np.tile(data, MC_list[0].epochs)
+						plt.plot(data, c=CLR_TEACH, ls='--')
 			plt.title("$\\breve{r}^\\mathrm{P}$ layer " + str(i+1))
 			# plt.grid()
 			# plt.ylim(0,1)
@@ -166,10 +166,10 @@ def plot(MC_list, MC_teacher=None, path=None):
 			for mc, c in zip(MC_list, color):
 				for j in range(len(mc.uI_time_series[0][i])):
 					plt.plot(np.array([vec[i][j] for vec in mc.uI_time_series[TPRE:]]), c=c)
-			if MC_teacher is not None:
-				data = np.array([vec[i][j] for vec in MC_teacher[0].uI_time_series[TPRE:]])
-				data = np.tile(data, MC_list[0].epochs)
-				plt.plot(data, c=CLR_TEACH, ls='--')
+					if MC_teacher is not None:
+						data = np.array([vec[i][j] for vec in MC_teacher[0].uI_time_series[TPRE:]])
+						data = np.tile(data, MC_list[0].epochs)
+						plt.plot(data, c=CLR_TEACH, ls='--')
 			plt.title("$u^\\mathrm{I}$ layer " + str(i+1))
 			# plt.grid()
 			# plt.ylim(0,1)
@@ -184,10 +184,10 @@ def plot(MC_list, MC_teacher=None, path=None):
 			for mc, c in zip(MC_list, color):
 				for j in range(len(mc.rI_breve_time_series[0][i])):
 					plt.plot(np.array([vec[i][j] for vec in mc.rI_breve_time_series[TPRE:]]), c=c)
-			if MC_teacher is not None:
-				data = np.array([vec[i][j] for vec in MC_teacher[0].rI_breve_time_series[TPRE:]])
-				data = np.tile(data, MC_list[0].epochs)
-				plt.plot(data, c=CLR_TEACH, ls='--')
+					if MC_teacher is not None:
+						data = np.array([vec[i][j] for vec in MC_teacher[0].rI_breve_time_series[TPRE:]])
+						data = np.tile(data, MC_list[0].epochs)
+						plt.plot(data, c=CLR_TEACH, ls='--')
 			plt.title("$\\breve{r}^\\mathrm{I}$ layer " + str(i+1))
 			# plt.grid()
 			# plt.ylim(0,1)
@@ -202,10 +202,10 @@ def plot(MC_list, MC_teacher=None, path=None):
 			for mc, c in zip(MC_list, color):
 				for j in range(len(mc.vapi_time_series[0][i])):
 					plt.plot(np.array([vec[i][j] for vec in mc.vapi_time_series[TPRE:]]), c=c)
-			if MC_teacher is not None:
-				data = np.array([vec[i][j] for vec in MC_teacher[0].vapi_time_series[TPRE:]])
-				data = np.tile(data, MC_list[0].epochs)
-				plt.plot(data, c=CLR_TEACH, ls='--')
+					if MC_teacher is not None:
+						data = np.array([vec[i][j] for vec in MC_teacher[0].vapi_time_series[TPRE:]])
+						data = np.tile(data, MC_list[0].epochs)
+						plt.plot(data, c=CLR_TEACH, ls='--')
 			plt.title("$v^\\mathrm{api}$ before noise injection, layer " + str(i+1))
 			# plt.grid()
 			# plt.ylim(0,1)

@@ -57,14 +57,28 @@ def main(params, task='fw_bw', seeds=[667], load=None):
 		MC_list = init_MC.init_MC(params, seeds)
 		logging.info(f'List of initialised student MCs: {MC_list}')
 
-		# init input signal
-		MC_list = init_signals.init_r0(MC_list=MC_list, form=params["input_signal"])
-
 		if task == 'fw_bw':
 			MC_teacher = init_MC.init_MC(params, seeds, teacher=True)
+			MC_teacher[0].set_self_predicting_state()
 			logging.info(f'Teacher initialised with seed {MC_teacher[0].seed}')
 
-			MC_teacher = init_signals.init_r0(MC_list=MC_teacher, form=params["input_signal"])
+			MC_teacher = init_signals.init_r0(MC_list=MC_teacher, form=params["input_signal"], seed=MC_teacher[0].seed)
+
+			for mc in MC_list:
+				if mc.copy_teacher_weights:
+						logging.info(f'Copying teacher weights')
+						mc.set_weights(model=MC_teacher[0])
+				if mc.copy_teacher_voltages:
+					logging.info(f'Copying teacher voltages')
+					mc.set_voltages(model=MC_teacher[0])
+
+		# init input signal
+		# if no teacher is present, use seed of first microcircuit
+		if task == 'bw_only':
+			MC_list = init_signals.init_r0(MC_list=MC_list, form=params["input_signal"], seed=MC_list[0].seed)
+		else:
+			MC_list = init_signals.init_r0(MC_list=MC_list, form=params["input_signal"], seed=MC_teacher[0].seed)
+
 
 		logging.info(f'Model: {params["model_type"]}')
 		logging.info(f'Task: {task}')
@@ -72,19 +86,13 @@ def main(params, task='fw_bw', seeds=[667], load=None):
 		if task == 'fw_bw':
 			logging.info(f'Running teacher to obtain target signal')
 
-			MC_teacher = [run_exp.run(MC_teacher[0], learn=False)]
+			MC_teacher = [run_exp.run(MC_teacher[0], learn=False, teacher=True)]
 
 			logging.info(f'Setting uP_breve in output layer of teacher as target')
 
 			for mc in MC_list:
-				mc.target = [vec[-1] for vec in MC_teacher[0].uP_breve_time_series]
-				
-				if mc.copy_teacher_weights:
-					logging.info(f'Copying teacher weights')
-					mc.set_weights(model=MC_teacher[0])
-				if mc.copy_teacher_weights:
-					logging.info(f'Copying teacher voltages')
-					mc.set_voltages(model=MC_teacher[0])
+				# use uP_breve time series after settling time
+				mc.target = MC_teacher[0].target
 
 		logging.debug(f"Current state of networks:")
 		for mc in MC_list:

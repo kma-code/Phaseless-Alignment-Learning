@@ -268,26 +268,34 @@ class base_model:
 	def get_old_voltages(self):
 		return self.uP_old, self.uI_old
 
+	def get_breve_voltages(self):
+		return self.uP_breve, self.uI_breve
 
-	def set_voltages(self, model=None, uP=None, uP_old=None, uI=None, uI_old=None):
+
+	def set_voltages(self, model=None, uP=None, uP_old=None, uP_breve=None, uI=None, uI_old=None, uI_breve=None):
 		# if another model is given, copy its voltages
 		if hasattr(model, '__dict__'):
 			uP, uI = model.get_voltages()
 			uP_old, uI_old = model.get_old_voltages()
+			uP_breve, uI_breve = model.get_breve_voltages()
 			print(f"Copying voltages from model {model}")
 
 		if uP is not None:
 			for i in range(len(self.layers)-1):
 				self.uP[i] = copy.deepcopy(uP[i])
-
 		if uP_old is not None:
 			for i in range(len(self.layers)-1):
 				self.uP_old[i] = copy.deepcopy(uP_old[i])
+		if uP_breve is not None:
+			for i in range(len(self.layers)-1):
+				self.uP_breve[i] = copy.deepcopy(uP_breve[i])
 
 		if uI is not None:
 			self.uI = copy.deepcopy(uI)
 		if uI_old is not None:
 			self.uI_old = copy.deepcopy(uI_old)
+		if uI_breve is not None:
+			self.uI_breve = copy.deepcopy(uI_breve)
 
 	def calc_vapi(self, rPvec, BPP_mat, rIvec, BPI_mat):
 		# returns apical voltages in pyramidals of a given layer
