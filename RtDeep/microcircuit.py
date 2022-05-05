@@ -15,6 +15,9 @@ def relu(x):
 def d_relu(x):
     return np.heaviside(x, 0)
 
+def soft_relu(x):
+	return np.log(1 + np.exp(x))
+
 def logistic(x):
     return 1/(1 + np.exp(-x))
 def d_logistic(x):
@@ -132,7 +135,7 @@ class base_model:
 		self.r0 = np.zeros(self.layers[0])
 
 	def init_record(self, rec_per_steps=1, rec_MSE=False, rec_WPP=False, rec_WIP=False, rec_BPP=False, rec_BPI=False,
-		rec_uP=False, rec_rP_breve=False, rec_rP_breve_HI=False, rec_uI=False, rec_rI_breve=False, rec_vapi=False, rec_vapi_noise=False, rec_noise=False, rec_epsilon=False, rec_epsilon_LO=False):
+		rec_uP=False, rec_uP_breve=False, rec_rP_breve=False, rec_rP_breve_HI=False, rec_uI=False, rec_uI_breve=False, rec_rI_breve=False, rec_vapi=False, rec_vapi_noise=False, rec_noise=False, rec_epsilon=False, rec_epsilon_LO=False):
 		# records the values of the variables given in var_array
 		# e.g. WPP, BPP, uP_breve
 		# rec_per_steps sets after how many steps data is recorded
@@ -150,12 +153,16 @@ class base_model:
 			self.BPI_time_series = []
 		if rec_uP:
 			self.uP_time_series = []
+		if rec_uP_breve:
+			self.uP_breve_time_series = []
 		if rec_rP_breve:
 			self.rP_breve_time_series = []
 		if rec_rP_breve_HI:
 			self.rP_breve_HI_time_series = []
 		if rec_uI:
 			self.uI_time_series = []
+		if rec_uI_breve:
+			self.uI_breve_time_series = []
 		if rec_rI_breve:
 			self.rI_breve_time_series = []
 		if rec_vapi:
@@ -188,12 +195,16 @@ class base_model:
 			self.BPI_time_series.append(copy.deepcopy(self.BPI))
 		if hasattr(self, 'uP_time_series'):
 			self.uP_time_series.append(copy.deepcopy(self.uP))
+		if hasattr(self, 'uP_breve_time_series'):
+			self.uP_breve_time_series.append(copy.deepcopy(self.uP_breve))
 		if hasattr(self, 'rP_breve_time_series'):
 			self.rP_breve_time_series.append(copy.deepcopy(self.rP_breve))
 		if hasattr(self, 'rP_breve_HI_time_series'):
 			self.rP_breve_HI_time_series.append(copy.deepcopy(self.rP_breve_HI))
 		if hasattr(self, 'uI_time_series'):
 			self.uI_time_series.append(copy.deepcopy(self.uI))
+		if hasattr(self, 'uI_breve_time_series'):
+			self.uI_breve_time_series.append(copy.deepcopy(self.uI_breve))
 		if hasattr(self, 'rI_breve_time_series'):
 			self.rI_breve_time_series.append(copy.deepcopy(self.rI_breve))
 		if hasattr(self, 'vapi_time_series'):
@@ -257,26 +268,34 @@ class base_model:
 	def get_old_voltages(self):
 		return self.uP_old, self.uI_old
 
+	def get_breve_voltages(self):
+		return self.uP_breve, self.uI_breve
 
-	def set_voltages(self, model=None, uP=None, uP_old=None, uI=None, uI_old=None):
+
+	def set_voltages(self, model=None, uP=None, uP_old=None, uP_breve=None, uI=None, uI_old=None, uI_breve=None):
 		# if another model is given, copy its voltages
 		if hasattr(model, '__dict__'):
 			uP, uI = model.get_voltages()
 			uP_old, uI_old = model.get_old_voltages()
+			uP_breve, uI_breve = model.get_breve_voltages()
 			print(f"Copying voltages from model {model}")
 
 		if uP is not None:
 			for i in range(len(self.layers)-1):
 				self.uP[i] = copy.deepcopy(uP[i])
-
 		if uP_old is not None:
 			for i in range(len(self.layers)-1):
 				self.uP_old[i] = copy.deepcopy(uP_old[i])
+		if uP_breve is not None:
+			for i in range(len(self.layers)-1):
+				self.uP_breve[i] = copy.deepcopy(uP_breve[i])
 
 		if uI is not None:
 			self.uI = copy.deepcopy(uI)
 		if uI_old is not None:
 			self.uI_old = copy.deepcopy(uI_old)
+		if uI_breve is not None:
+			self.uI_breve = copy.deepcopy(uI_breve)
 
 	def calc_vapi(self, rPvec, BPP_mat, rIvec, BPI_mat):
 		# returns apical voltages in pyramidals of a given layer
@@ -309,7 +328,7 @@ class base_model:
 		return uvec_old + tau * (uvec - uvec_old) / dt
 
 
-	def evolve_system(self, r0=None, u_tgt=None, learn_weights=True):
+	def evolve_system(self, r0=None, u_tgt=None, learn_weights=True, learn_bw_weights=False):
 
 		""" evolves the system by one time step:
 			updates synaptic weights and voltages
@@ -720,33 +739,40 @@ class phased_noise_model(base_model):
 			 this function injects noise into a given layer
 			 by adding it to the apical potential
 		"""
-		
-		# TO DO: adapt epsilon for multiple hidden layers
 
 		# if dtxi timesteps have passed, sample new noise
 		if np.all(self.noise[layer] == 0) or self.noise_counter % self.noise_total_counts == 0:
 
 			if self.noise_mode == 'uP_adaptive':
 
-				# calculate Jacobian alignment factor epsilon
-				self.epsilon = [1/2 * (1 - self.uP_breve[layer] @ self.BPP[layer] @ self.rP_breve[-1]  \
-				/ np.linalg.norm(self.uP_breve[layer]) / np.linalg.norm(self.BPP[layer] @ self.rP_breve[-1]))]
+				# iterate over hidden layers
+				for i in range(len(self.layers)-2):
 
-				# update low-pass filtered version of epsilon, with filter time-constant Tpres
-				self.epsilon_LO[layer] += self.dt/self.tau_eps * (self.epsilon[layer] - self.epsilon_LO[layer])
+					# first, we reset all noise values
+					self.noise[i] = np.zeros(shape=self.uP[i].shape)
+					self.vapi_noise[i] = self.vapi[i]
 
-				# generate noise, rescaled with epsilon
-				# if epsilon is below threshold, do not inject noise
-				if self.epsilon_LO[layer] > 1/2 * (1 - np.cos(self.noise_deg * np.pi/180)):
-					self.noise[layer] = noise_scale[layer] * self.epsilon_LO[layer] * np.array([np.random.normal(0, np.abs(x)) for x in self.uP[layer]])
-					self.vapi_noise[layer] = self.vapi[layer] + self.noise[layer]
+					# 'layer' is the layer which currently has active noise injection/bw learning
+					if i == layer:
 
-				else:
-					self.noise[layer] = np.zeros(shape=self.uP[layer].shape)
-					self.vapi_noise[layer] = self.vapi[layer]	
+						# calculate Jacobian alignment factor epsilon
+						self.epsilon[layer] = 1/2 * (1 - self.uP_breve[layer] @ self.BPP[layer] @ self.rP_breve[-1]  \
+						/ np.linalg.norm(self.uP_breve[layer]) / np.linalg.norm(self.BPP[layer] @ self.rP_breve[-1]))
+
+						# update low-pass filtered version of epsilon, with filter time-constant Tpres
+						self.epsilon_LO[layer] += self.dt/self.tau_eps * (self.epsilon[layer] - self.epsilon_LO[layer])
+
+						# generate noise, rescaled with epsilon
+						# if epsilon is below threshold, do not inject noise
+						if self.epsilon_LO[layer] > 1/2 * (1 - np.cos(self.noise_deg * np.pi/180)):
+							self.noise[layer] = noise_scale[layer] * self.epsilon_LO[layer] * np.array([np.random.normal(0, np.abs(x)) for x in self.uP[layer]])
+							self.vapi_noise[layer] = self.vapi[layer] + self.noise[layer]
+				
 
 				
 			elif self.noise_mode == 'dynamic':
+				# THIS MODE IS NOT IMPLEMENTED PROPER
+				# USE WITH CAUTION
 
 				# epsilon follows a diff eq in this case
 				self.depsilon[layer] = 1/self.tau_eps * (0.01 * self.vapi[layer] - self.epsilon[layer] + min([0.1, 1e12 * np.linalg.norm(self.dBPP[layer])/self.dt]) * self.uP[layer])
