@@ -518,9 +518,10 @@ class base_model:
 
 
 
-class phased_noise_model(base_model):
-	""" This class inherits all properties from the base model class and adds the function to add phased noise """
-	def __init__(self, dt, dtxi, tausyn, Tbw, Tpres, noise_scale, alpha, inter_low_pass, pyr_hi_pass, dWPP_low_pass, gate_regularizer, noise_mode,
+class noise_model(base_model):
+	""" This class inherits all properties from the base model class and adds the function to add noise """
+	def __init__(self, dt, dtxi, tausyn, Tpres, noise_scale, alpha, inter_low_pass, pyr_hi_pass, dWPP_low_pass, gate_regularizer,
+					noise_type, noise_mode,
 					model, activation, layers,
 					uP_init, uI_init, WPP_init, WIP_init, BPP_init, BPI_init,
 					gl, gden, gbas, gapi, gnI, gntgt,
@@ -536,6 +537,8 @@ class phased_noise_model(base_model):
 
 		# new variables:
 
+		# type of noise (OU or white)
+		self.noise_type = noise_type
 		# mode of noise injection (order vapi or uP or uP_adative)
 		self.noise_mode = noise_mode
 		# for uP_adaptive, we need epsilon: measures angle between BPP, WPP.T
@@ -543,9 +546,8 @@ class phased_noise_model(base_model):
 		if noise_mode == 'uP_adaptive':
 			self.noise_deg = kwargs.get('noise_deg')
 			self.tau_eps = kwargs.get('taueps')
-		if noise_mode == 'dynamic':
-			self.depsilon = [np.float64(0.0) for BPP in self.BPP]
-			self.dBPP = [np.zeros(shape=BPP.shape) for BPP in self.BPP]
+		if noise_type == 'OU':
+			self.tauxi = kwargs.get('tauxi')
 		# low-pass filtered version of epsilon
 		self.epsilon_LO = deepcopy_array(self.epsilon)
 
@@ -557,25 +559,12 @@ class phased_noise_model(base_model):
 		self.dWPP_low_pass = dWPP_low_pass
 		# whether to gate application of the regularizer
 		self.gate_regularizer = gate_regularizer
-		if self.gate_regularizer:
-			# need to to define the gate, i.e. the derivative of activation
-			self.d_activation = []
-			for activation in self.activation:
-				if activation == relu:
-					self.d_activation.append(d_relu)
-				elif activation == hard_sigmoid:
-					self.d_activation.append(d_hard_sigmoid)
 		# noise time scale
 		self.dtxi = dtxi
 		# decimals of dt
 		self.dt_decimals = np.int(np.round(-np.log10(self.dt)))
 		# synaptic time constant (sets the low-pass filter of interneuron)
 		self.tausyn = tausyn
-		# time scale of backward learning phase
-		self.Tbw = Tbw
-		# define a variable for currently learnt backwards synapse
-		# init at last synapse
-		self.active_bw_syn = 0
 		# gaussian noise properties
 		self.noise_scale = noise_scale
 		self.noise = [np.zeros(shape=uP.shape) for uP in self.uP]
@@ -603,15 +592,15 @@ class phased_noise_model(base_model):
 
 		""" 
 			This overwrites the vanilla system evolution and implements
-			phased noise
+			additional noise
 		"""
 
-		# update which backwards weights to learn
-		if learn_bw_weights and self.Time % self.Tbw == 0:
-			# print(f"Current time: {self.Time}s")
-			self.active_bw_syn = 0 if self.active_bw_syn == len(self.BPP) - 1 else self.active_bw_syn + 1
-			# print(f"Learning backward weights to layer {self.active_bw_syn + 1}")
-			self.noise_counter = 0
+		# # update which backwards weights to learn
+		# if learn_bw_weights and self.Time % self.Tbw == 0:
+		# 	# print(f"Current time: {self.Time}s")
+		# 	self.active_bw_syn = 0 if self.active_bw_syn == len(self.BPP) - 1 else self.active_bw_syn + 1
+		# 	# print(f"Learning backward weights to layer {self.active_bw_syn + 1}")
+		# 	self.noise_counter = 0
 
 		# calculate voltage evolution, including low pass on interneuron synapses
 		# see calc_dendritic updates below
@@ -623,7 +612,7 @@ class phased_noise_model(base_model):
 		if learn_weights:
 			self.dWPP, self.dWIP, _, self.dBPI = self.evolve_synapses(r0)
 		if learn_bw_weights:
-			self.dBPP = self.evolve_bw_synapses(self.active_bw_syn)
+			self.dBPP = self.evolve_bw_synapses()
 
 		# apply evolution
 		for i in range(len(self.duP)):
@@ -664,7 +653,7 @@ class phased_noise_model(base_model):
 			Overwrites voltage evolution:
 			Evolves the pyramidal and interneuron voltages by one dt
 			using r0 as input rates
-			>> Injects noise into vapi or uP
+			>> Injects noise into vapi
 		"""
 
 		self.duP = [np.zeros(shape=uP.shape) for uP in self.uP]
@@ -692,10 +681,12 @@ class phased_noise_model(base_model):
 		self.uP_old = deepcopy_array(self.uP)
 		self.uI_old = deepcopy_array(self.uI)
 
-		self.vbas, self.vapi, self.vden = self.calc_dendritic_updates(r0, u_tgt)
+		self.vbas, self.vapi, self.vapi_noise, self.vden = self.calc_dendritic_updates(r0, u_tgt)
 
 		# inject noise into newly calculated vapi before calculating update du
-		if inject_noise: self.inject_noise(layer=self.active_bw_syn, noise_scale=self.noise_scale)
+		if inject_noise:
+			for i in range(len(self.BPP)):
+				self.generate_noise(layer=i, noise_type=self.noise_type, noise_scale=self.noise_scale)
 
 		self.duP, self.duI = self.calc_somatic_updates(u_tgt, inject_noise=inject_noise)
 
@@ -733,68 +724,63 @@ class phased_noise_model(base_model):
 		return self.duP, self.duI
 
 
-	def inject_noise(self, layer, noise_scale):
+	def generate_noise(self, layer, noise_type, noise_scale):
 
 		"""
-			 this function injects noise into a given layer
-			 by adding it to the apical potential
+			 this function generates noise for a given layer
+			 the noise is added to the apical potential in function calculate_dendritic_updates
+
+			 there are two noise types:
+			 - hold_white_noise: adds steps of width dtxi and height sampled from normal distribution
+			 - OU: ornstein-uhlenbeck noise, i.e. low-pass filtered white noise updated at every dtxi
 		"""
 
 		# if dtxi timesteps have passed, sample new noise
 		if np.all(self.noise[layer] == 0) or self.noise_counter % self.noise_total_counts == 0:
 
 			if self.noise_mode == 'uP_adaptive':
+				None # FIX THIS MODE
 
-				# iterate over hidden layers
-				for i in range(len(self.layers)-2):
+			# 	# iterate over hidden layers
+			# 	for i in range(len(self.layers)-2):
 
-					# first, we reset all noise values
-					self.noise[i] = np.zeros(shape=self.uP[i].shape)
-					self.vapi_noise[i] = self.vapi[i]
+			# 		# first, we reset all noise values
+			# 		self.noise[i] = np.zeros(shape=self.uP[i].shape)
+			# 		self.vapi_noise[i] = self.vapi[i]
 
-					# 'layer' is the layer which currently has active noise injection/bw learning
-					if i == layer:
+			# 		# 'layer' is the layer which currently has active noise injection/bw learning
+			# 		if i == layer:
 
-						# calculate Jacobian alignment factor epsilon
-						self.epsilon[layer] = 1/2 * (1 - self.uP_breve[layer] @ self.BPP[layer] @ self.rP_breve[-1]  \
-						/ np.linalg.norm(self.uP_breve[layer]) / np.linalg.norm(self.BPP[layer] @ self.rP_breve[-1]))
+			# 			# calculate Jacobian alignment factor epsilon
+			# 			self.epsilon[layer] = 1/2 * (1 - self.uP_breve[layer] @ self.BPP[layer] @ self.rP_breve[-1]  \
+			# 			/ np.linalg.norm(self.uP_breve[layer]) / np.linalg.norm(self.BPP[layer] @ self.rP_breve[-1]))
 
-						# update low-pass filtered version of epsilon, with filter time-constant Tpres
-						self.epsilon_LO[layer] += self.dt/self.tau_eps * (self.epsilon[layer] - self.epsilon_LO[layer])
+			# 			# update low-pass filtered version of epsilon, with filter time-constant Tpres
+			# 			self.epsilon_LO[layer] += self.dt/self.tau_eps * (self.epsilon[layer] - self.epsilon_LO[layer])
 
-						# generate noise, rescaled with epsilon
-						# if epsilon is below threshold, do not inject noise
-						if self.epsilon_LO[layer] > 1/2 * (1 - np.cos(self.noise_deg * np.pi/180)):
-							self.noise[layer] = noise_scale[layer] * self.epsilon_LO[layer] * np.array([np.random.normal(0, np.abs(x)) for x in self.uP[layer]])
-							self.vapi_noise[layer] = self.vapi[layer] + self.noise[layer]
-				
-
-				
-			elif self.noise_mode == 'dynamic':
-				# THIS MODE IS NOT IMPLEMENTED PROPER
-				# USE WITH CAUTION
-
-				# epsilon follows a diff eq in this case
-				self.depsilon[layer] = 1/self.tau_eps * (0.01 * self.vapi[layer] - self.epsilon[layer] + min([0.1, 1e12 * np.linalg.norm(self.dBPP[layer])/self.dt]) * self.uP[layer])
-				self.epsilon[layer] += self.depsilon[layer]
-
-				# generate noise, where epsilon sets the scale
-				self.noise[layer] = np.array([np.random.normal(0, np.abs(x)) for x in self.epsilon[layer]])
-
+			# 			# generate noise, rescaled with epsilon
+			# 			# if epsilon is below threshold, do not inject noise
+			# 			if self.epsilon_LO[layer] > 1/2 * (1 - np.cos(self.noise_deg * np.pi/180)):
+			# 				white_noise = noise_scale[layer] * self.epsilon_LO[layer] * np.array([np.random.normal(0, np.abs(x)) for x in self.uP[layer]])
 
 			elif self.noise_mode == 'uP':
 				# add noise with magnitude of rescaled uP
-				self.noise[layer] = noise_scale[layer] * np.array([np.random.normal(0, np.abs(x)) for x in self.uP[layer]])
-				self.vapi_noise[layer] = self.vapi[layer] + self.noise[layer]
+				white_noise = noise_scale[layer] * np.array([np.random.normal(0, np.abs(x)) for x in self.uP[layer]])
 
 			elif self.noise_mode == 'vapi':
 				# add noise with magnitude of rescaled vapi
-				self.noise[layer] = noise_scale[layer] * np.array([np.random.normal(0, np.abs(x)) for x in self.vapi[layer]])
-				self.vapi_noise[layer] = self.vapi[layer] + self.noise[layer]
+				white_noise = noise_scale[layer] * np.array([np.random.normal(0, np.abs(x)) for x in self.vapi[layer]])
+
+			# the noise will be added to vapi, depending on the mode
+			if self.noise_type == 'hold_white_noise':
+				self.noise[layer] = white_noise
+			elif self.noise_type == 'OU':
+				self.noise[layer] += 1 / (self.tauxi) * (- self.dt * self.noise[layer] + np.sqrt(self.dt) * white_noise)
 			
 			self.noise_counter = 0
 
 		self.noise_counter += 1
+
 
 	def calc_rP_breve_HI(self):
 		# updates the high-passed instantaneous rate rP_breve_HI which is used to update BPP
@@ -824,6 +810,7 @@ class phased_noise_model(base_model):
 		"""
 			this overwrites the dendritic updates by adding a low-pass on
 			the interneuron voltages
+			and adds vapi_noise somatic voltage after noise injection
 
 		"""
 
@@ -843,57 +830,67 @@ class phased_noise_model(base_model):
 
 		for i in range(0, len(self.layers)-2):
 			self.vapi[i] = self.calc_vapi(self.rP_breve[-1], self.BPP[i], self.rI_breve[-1], self.BPI[i])
+			self.vapi_noise[i] = self.vapi[i] + self.noise[i]
 
-		return self.vbas, self.vapi, self.vden
+		return self.vbas, self.vapi, self.vapi_noise, self.vden
 
-	def evolve_bw_synapses(self, active_bw_syn):
-		# evolve the synapses in BPP of layer #active_bw_syn
+	def evolve_bw_synapses(self):
+		# evolve the synapses of BPPs
 
 		self.dBPP = [np.zeros(shape=BPP.shape) for BPP in self.BPP]
 
-		if self.model == "LDRL":
-			if self.pyr_hi_pass:
-				self.dBPP[active_bw_syn] = self.dt * self.eta_bw[active_bw_syn] * np.outer(
-					self.noise[active_bw_syn], self.rP_breve_HI[-1]
-					)
-				# add regularizer
-				if self.gate_regularizer:
-					self.dBPP[active_bw_syn] -= self.dt * self.alpha[active_bw_syn] * \
-						self.eta_bw[active_bw_syn] * self.BPP[active_bw_syn] * self.d_activation[-1](self.rP_breve_HI[-1])
-				else:
-					self.dBPP[active_bw_syn] -= self.dt * self.alpha[active_bw_syn] * self.eta_bw[active_bw_syn] * self.BPP[active_bw_syn]
+		for i in range(len(self.BPP)):
 
-			else:
-				self.dBPP[active_bw_syn] = self.dt * self.eta_bw[active_bw_syn] * np.outer(
-					self.noise[active_bw_syn], self.rP_breve[-1]
-					)
-				# add regularizer
-				if self.gate_regularizer:
-					self.dBPP[active_bw_syn] -= self.dt * self.alpha[active_bw_syn] * \
-						self.eta_bw[active_bw_syn] * self.BPP[active_bw_syn] * self.d_activation[-1](self.rP_breve[-1])
-				else:
-					self.dBPP[active_bw_syn] -= self.dt * self.alpha[active_bw_syn] * self.eta_bw[active_bw_syn] * self.BPP[active_bw_syn]
-			
-
-
-		elif self.model == "DTPDRL":
-			if self.pyr_hi_pass:
-				# self.dBPP[active_bw_syn] = - self.dt * self.eta_bw[active_bw_syn] * np.outer(
-				# 	self.BPP[active_bw_syn]@self.rP_breve_HI[-1] + self.BPI[active_bw_syn]@self.rI_breve[-1] - self.noise[active_bw_syn],
-				# 	self.rP_breve_HI[-1]
-				# 	)
-				if np.linalg.norm(self.noise[active_bw_syn]) != 0.0:
-					self.dBPP[active_bw_syn] = - self.dt * self.eta_bw[active_bw_syn] * np.outer(
-						self.BPP[active_bw_syn] @ self.rP_breve_HI[-1] - self.noise[active_bw_syn],
-						self.rP_breve_HI[-1]
+			if self.model == "LDRL":
+				if self.pyr_hi_pass:
+					self.dBPP[i] = self.dt * self.eta_bw[i] * np.outer(
+						self.noise[i], self.rP_breve_HI[-1]
 						)
-			else:
-				self.dBPP[active_bw_syn] = - self.dt * self.eta_bw[active_bw_syn] * np.outer(
-					self.BPP[active_bw_syn]@self.rP_breve[-1] + self.BPI[active_bw_syn]@self.rI_breve[-1] - self.noise[active_bw_syn],
-					self.rP_breve[-1]
-					)
-			# add regularizer
-			self.dBPP[active_bw_syn] -= self.dt * self.alpha[active_bw_syn] * self.eta_bw[active_bw_syn] * self.BPP[active_bw_syn]
+					# add regularizer with gate or without
+					if self.gate_regularizer:
+						self.dBPP[i] -= self.dt * self.alpha[i] * \
+							self.eta_bw[i] * self.BPP[i] * d_relu(self.rP_breve_HI[-1])
+					else:
+						self.dBPP[i] -= self.dt * self.alpha[i] * self.eta_bw[i] * self.BPP[i]
+
+				else:
+					self.dBPP[i] = self.dt * self.eta_bw[i] * np.outer(
+						self.noise[i], self.rP_breve[-1]
+						)
+					# add regularizer with gate or without
+					if self.gate_regularizer:
+						self.dBPP[i] -= self.dt * self.alpha[i] * \
+							self.eta_bw[i] * self.BPP[i] * d_relu(self.rP_breve[-1])
+					else:
+						self.dBPP[i] -= self.dt * self.alpha[i] * self.eta_bw[i] * self.BPP[i]
+				
+
+
+			elif self.model == "DTPDRL":
+				if self.pyr_hi_pass:
+					if np.linalg.norm(self.noise[i]) != 0.0:
+						self.dBPP[i] = - self.dt * self.eta_bw[i] * np.outer(
+							self.BPP[i] @ self.rP_breve_HI[-1] - self.noise[i],
+							self.rP_breve_HI[-1]
+							)
+					# add regularizer with gate or without
+					if self.gate_regularizer:
+						self.dBPP[i] -= self.dt * self.alpha[i] * \
+							self.eta_bw[i] * self.BPP[i] * d_relu(self.rP_breve_HI[-1])
+					else:
+						self.dBPP[i] -= self.dt * self.alpha[i] * self.eta_bw[i] * self.BPP[i]
+
+				else:
+					self.dBPP[i] = - self.dt * self.eta_bw[i] * np.outer(
+						self.BPP[i] @ self.rP_breve[-1] + self.BPI[i] @ self.rI_breve[-1] - self.noise[i],
+						self.rP_breve[-1]
+						)
+					# add regularizer with gate or without
+					if self.gate_regularizer:
+						self.dBPP[i] -= self.dt * self.alpha[i] * \
+							self.eta_bw[i] * self.BPP[i] * d_relu(self.rP_breve[-1])
+					else:
+						self.dBPP[i] -= self.dt * self.alpha[i] * self.eta_bw[i] * self.BPP[i]
 
 
 		return self.dBPP
