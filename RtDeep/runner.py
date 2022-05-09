@@ -158,6 +158,9 @@ if __name__ == '__main__':
 	logging.info('Sucessfully imported parameters')
 	logging.debug(PARAMETERS)
 
+	if ARGS.task not in ['bw_only', 'fw_bw']:
+		raise ValueError("Task not recognized. Use 'bw_only' or 'fw_bw'")
+
 	main(params=PARAMETERS, task=ARGS.task, seeds=PARAMETERS['random_seed'], load=ARGS.load)
 
 

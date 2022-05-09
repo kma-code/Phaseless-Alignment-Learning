@@ -29,7 +29,7 @@ def plot(MC_list, MC_teacher=None, path=None):
 	# color of teacher
 	CLR_TEACH = 'k'
 
-	if MC_list[0].rec_MSE:
+	if MC_list[0].rec_MSE and MC_teacher is not None:
 
 		fig = plt.figure()
 		for mc, c in zip(MC_list, color):
