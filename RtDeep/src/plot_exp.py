@@ -80,8 +80,8 @@ def plot(MC_list, MC_teacher=None, path=None):
 			for mc, c in zip(MC_list, color):
 				for j in range(len(mc.BPP_time_series[0][i])):
 					plt.plot(np.array([vec[i][j] for vec in mc.BPP_time_series[TPRE:]]), c=c)
-					if MC_teacher is not None:
-						plt.plot(np.array([MC_teacher[0].BPP[i][j] for vec in MC_list[0].BPP_time_series[TPRE:]]), c=CLR_TEACH, ls='--')
+					# if MC_teacher is not None:
+					# 	plt.plot(np.array([MC_teacher[0].BPP[i][j] for vec in MC_list[0].BPP_time_series[TPRE:]]), c=CLR_TEACH, ls='--')
 			plt.title("$B^\\mathrm{PP}$ layer " + str(i+1))
 			# plt.grid()
 			# plt.ylim(0,1)
@@ -96,8 +96,8 @@ def plot(MC_list, MC_teacher=None, path=None):
 			for mc, c in zip(MC_list, color):
 				for j in range(len(mc.BPI_time_series[0][i])):
 					plt.plot(np.array([vec[i][j] for vec in mc.BPI_time_series[TPRE:]]), c=c)
-					if MC_teacher is not None:
-						plt.plot(np.array([MC_teacher[0].BPI[i][j] for vec in MC_list[0].BPI_time_series[TPRE:]]), c=CLR_TEACH, ls='--')
+					# if MC_teacher is not None:
+					# 	plt.plot(np.array([MC_teacher[0].BPI[i][j] for vec in MC_list[0].BPI_time_series[TPRE:]]), c=CLR_TEACH, ls='--')
 			plt.title("$B^\\mathrm{PI}$ layer " + str(i+1))
 			# plt.grid()
 			# plt.ylim(0,1)
@@ -283,6 +283,32 @@ def plot(MC_list, MC_teacher=None, path=None):
 			plt.ylim(-1.1,1.1)
 			plt.xlabel(str(MC_list[0].rec_per_steps) + ' dt')
 			file_name = 'cos_layer'+str(i+1)+'.png'
+			plt.savefig(PATH + file_name, dpi=200)
+
+	if hasattr(MC_list[0], "angle_dWPP_time_series"):
+
+		for i in range(len(MC_list[0].angle_dWPP_time_series[0])):
+			fig = plt.figure()
+			for mc, c in zip(MC_list, color):
+				plt.plot([vec[i] for vec in mc.angle_dWPP_time_series[TPRE:]], c=c)
+			plt.title("$\\angle (\\Delta W^\\mathrm{PP}, \\mathrm{BP})$ layer " + str(i+1))
+			plt.ylabel("deg")
+			plt.grid()
+			plt.xlabel(str(MC_list[0].rec_per_steps) + ' dt')
+			file_name = 'angle_BP_dWPP'+str(i+1)+'.png'
+			plt.savefig(PATH + file_name, dpi=200) 
+
+	if hasattr(MC_list[0], "angle_jacobians_BP_time_series"):
+
+		for i in range(len(MC_list[0].angle_jacobians_BP_time_series[0])):
+			fig = plt.figure()
+			for mc, c in zip(MC_list, color):
+				plt.plot([vec[i] for vec in mc.angle_jacobians_BP_time_series[TPRE:]], c=c)
+			plt.title("$\\angle (J_g, J_f^T)$ layer " + str(i+1))
+			plt.ylabel("deg")
+			plt.grid()
+			plt.xlabel(str(MC_list[0].rec_per_steps) + ' dt')
+			file_name = 'angle_jacobians_BP'+str(i+1)+'.png'
 			plt.savefig(PATH + file_name, dpi=200) 
 
 

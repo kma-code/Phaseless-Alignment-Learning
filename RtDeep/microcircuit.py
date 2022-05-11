@@ -17,6 +17,8 @@ def d_relu(x):
 
 def soft_relu(x):
 	return np.log(1 + np.exp(x))
+def d_soft_relu(x):
+	return 1 / (1 + np.exp(-x))
 
 def logistic(x):
     return 1/(1 + np.exp(-x))
@@ -134,8 +136,11 @@ class base_model:
 
 		self.r0 = np.zeros(self.layers[0])
 
-	def init_record(self, rec_per_steps=1, rec_MSE=False, rec_WPP=False, rec_WIP=False, rec_BPP=False, rec_BPI=False,
-		rec_uP=False, rec_uP_breve=False, rec_rP_breve=False, rec_rP_breve_HI=False, rec_uI=False, rec_uI_breve=False, rec_rI_breve=False, rec_vapi=False, rec_vapi_noise=False, rec_noise=False, rec_epsilon=False, rec_epsilon_LO=False):
+	def init_record(self, rec_per_steps=1, rec_MSE=False, rec_error=False,
+		rec_WPP=False, rec_WIP=False, rec_BPP=False, rec_BPI=False,
+		rec_dWPP=False, rec_dWIP=False, rec_dBPP=False, rec_dBPI=False,
+		rec_uP=False, rec_uP_breve=False, rec_rP_breve=False, rec_rP_breve_HI=False, rec_uI=False, rec_uI_breve=False, rec_rI_breve=False,
+		rec_vapi=False, rec_vapi_noise=False, rec_noise=False, rec_epsilon=False, rec_epsilon_LO=False):
 		# records the values of the variables given in var_array
 		# e.g. WPP, BPP, uP_breve
 		# rec_per_steps sets after how many steps data is recorded
@@ -143,6 +148,8 @@ class base_model:
 		
 		if rec_MSE:
 			self.MSE_time_series = []
+		if rec_error:
+			self.error_time_series = []
 		if rec_WPP:
 			self.WPP_time_series = []
 		if rec_WIP:
@@ -151,6 +158,14 @@ class base_model:
 			self.BPP_time_series = []
 		if rec_BPI:
 			self.BPI_time_series = []
+		if rec_dWPP:
+			self.dWPP_time_series = []
+		if rec_dWIP:
+			self.dWIP_time_series = []
+		if rec_dBPP:
+			self.dBPP_time_series = []
+		if rec_dBPI:
+			self.dBPI_time_series = []
 		if rec_uP:
 			self.uP_time_series = []
 		if rec_uP_breve:
@@ -185,6 +200,10 @@ class base_model:
 			self.MSE_time_series.append(
 				MSE(self.uP_breve[-1], target)
 				)
+		if hasattr(self, 'error_time_series') and target is not None:
+			self.error_time_series.append(
+				self.uP_breve[-1] - target
+				)
 		if hasattr(self, 'WPP_time_series'):
 			self.WPP_time_series.append(copy.deepcopy(self.WPP))
 		if hasattr(self, 'WIP_time_series'):
@@ -193,6 +212,14 @@ class base_model:
 			self.BPP_time_series.append(copy.deepcopy(self.BPP))
 		if hasattr(self, 'BPI_time_series'):
 			self.BPI_time_series.append(copy.deepcopy(self.BPI))
+		if hasattr(self, 'dWPP_time_series') and hasattr(self, 'dWPP'):
+			self.dWPP_time_series.append(copy.deepcopy(self.dWPP))
+		if hasattr(self, 'dWIP_time_series')and hasattr(self, 'dWIP'):
+			self.dWIP_time_series.append(copy.deepcopy(self.dWIP))
+		if hasattr(self, 'dBPP_time_series')and hasattr(self, 'dBPP'):
+			self.dBPP_time_series.append(copy.deepcopy(self.dBPP))
+		if hasattr(self, 'dBPI_time_series')and hasattr(self, 'dBPI'):
+			self.dBPI_time_series.append(copy.deepcopy(self.dBPI))
 		if hasattr(self, 'uP_time_series'):
 			self.uP_time_series.append(copy.deepcopy(self.uP))
 		if hasattr(self, 'uP_breve_time_series'):

@@ -113,14 +113,16 @@ def init_MC(params, seeds, teacher=False):
 					)
 				)
 
-		elif params["model_type"] in ["DTPDRL"]:
+		elif params["model_type"] in ["DTPDRL", "LDRL"]:
+			noise_deg = params["noise_deg"] if "noise_deg" in params else None
+			taueps = params["taueps"] if "taueps" in params else None
+			tauxi = params["tauxi"] if "tauxi" in params else None
 
 			MC_list.append(
-				phased_noise_model(
+				noise_model(
 					dt=params["dt"],
 					dtxi=params["dtxi"],
 					tausyn=params["tausyn"],
-					Tbw=params["Tbw"],
 					Tpres=params["Tpres"],
 					noise_scale=params["noise_scale"],
 					alpha=params["alpha"],
@@ -128,6 +130,8 @@ def init_MC(params, seeds, teacher=False):
 					pyr_hi_pass=params["pyr_hi_pass"],
 					dWPP_low_pass=params["dWPP_low_pass"],
 					gate_regularizer=params["gate_regularizer"],
+
+					noise_type=params["noise_type"],
 					noise_mode=params["noise_mode"],
 					model=params["model_type"],
 		            activation=activation_list,
@@ -152,8 +156,10 @@ def init_MC(params, seeds, teacher=False):
 					eta_PI=params["eta_PI"],
 					eta_IP=params["eta_IP"],
 
-					noise_deg=params["noise_deg"],
-					taueps=params["taueps"]
+					noise_deg=noise_deg,
+					taueps=taueps,
+					tauxi=tauxi
+
 					)
 				)
 		# save seed of mc and other params
@@ -171,12 +177,18 @@ def init_MC(params, seeds, teacher=False):
 		MC_list[-1].rec_per_steps=params["rec_per_steps"]
 		if teacher:
 			MC_list[-1].rec_MSE=False
+			MC_list[-1].rec_error=False
 		else:
 			MC_list[-1].rec_MSE=params["rec_MSE"]
+			MC_list[-1].rec_error=params["rec_error"]
 		MC_list[-1].rec_WPP=params["rec_WPP"]
 		MC_list[-1].rec_WIP=params["rec_WIP"]
 		MC_list[-1].rec_BPP=params["rec_BPP"] 
 		MC_list[-1].rec_BPI=params["rec_BPI"]
+		MC_list[-1].rec_dWPP=params["rec_dWPP"]
+		MC_list[-1].rec_dWIP=params["rec_dWIP"]
+		MC_list[-1].rec_dBPP=params["rec_dBPP"] 
+		MC_list[-1].rec_dBPI=params["rec_dBPI"]
 		MC_list[-1].rec_uP=params["rec_uP"]
 		MC_list[-1].rec_uP_breve=params["rec_uP_breve"]
 		MC_list[-1].rec_rP_breve=params["rec_rP_breve"]

@@ -11,6 +11,7 @@ import src.init_signals as init_signals
 import src.run_exp as run_exp
 import src.plot_exp as plot_exp
 import src.save_exp as save_exp
+import src.compare as compare
 
 import sys
 import os
@@ -41,12 +42,15 @@ def parse_experiment_arguments():
 	parser.add_argument('--load', type=str,
 						help='Load a previously saved model from a .pkl file.',
 						default=None)
+	parser.add_argument('--compare', type=str,
+						help='Compare weight updates to backprop (BP) or Gauss-Newton (GN).',
+						default=None)
 	args = parser.parse_args()
 
 	return args
 
 
-def main(params, task='fw_bw', seeds=[667], load=None):
+def main(params, task='fw_bw', seeds=[667], load=None, compare_model=None):
 
 
 
@@ -122,9 +126,18 @@ def main(params, task='fw_bw', seeds=[667], load=None):
 		logging.info(f'Loading results from {load}')
 		MC_list = save_exp.load(load)
 		if task == 'fw_bw':
-			MC_teacher, MC_list = MC_list[0], MC_list[1:]
+			MC_teacher, MC_list = [MC_list[0]], MC_list[1:]
 
 
+	if compare_model is not None:
+		logging.info(f'Generating comparison to {compare_model}')
+
+		if task == 'fw_bw':
+			# generate comparison with BP weight updates
+			MC_list = compare.compare_updates(MC_list=MC_list, model=compare_model)
+		
+		# create angle between Jacobians
+		MC_list = compare.compare_jacobians(MC_list=MC_list, model=compare_model)
 
 
 	logging.info(f'Plotting results')
@@ -161,7 +174,10 @@ if __name__ == '__main__':
 	if ARGS.task not in ['bw_only', 'fw_bw']:
 		raise ValueError("Task not recognized. Use 'bw_only' or 'fw_bw'")
 
-	main(params=PARAMETERS, task=ARGS.task, seeds=PARAMETERS['random_seed'], load=ARGS.load)
+	if ARGS.compare not in ['BP', None]:
+		raise ValueError("Model to compare to unkown. Use 'BP' or 'none'")
+
+	main(params=PARAMETERS, task=ARGS.task, seeds=PARAMETERS['random_seed'], load=ARGS.load, compare_model=ARGS.compare)
 
 
 
