@@ -132,9 +132,9 @@ def main(params, task='fw_bw', seeds=[667], load=None, compare_model=None):
 	if compare_model is not None:
 		logging.info(f'Generating comparison to {compare_model}')
 
-		if task == 'fw_bw':
+		# if task == 'fw_bw':
 			# generate comparison with BP weight updates
-			MC_list = compare.compare_updates(MC_list=MC_list, model=compare_model)
+			# MC_list = compare.compare_updates(MC_list=MC_list, model=compare_model)
 		
 		# create angle between Jacobians
 		MC_list = compare.compare_jacobians(MC_list=MC_list, model=compare_model)

@@ -19,34 +19,43 @@ derivative_mappings = {
 def compare_updates(MC_list, model):
 	# compare updates of mc object to dWPP of BP
 
+	# define the number of recorded time steps which belong to the pre-training
+	# and therefore should be skipped in plotting
+	TPRE = int(MC_list[0].settling_time / MC_list[0].dt / MC_list[0].rec_per_steps)
+
 	if model == "BP":
 
 		for mc in MC_list:
 			d_activation_list = [derivative_mappings[activation] for activation in mc.activation]
+			r0 = np.tile(mc.input, mc.epochs)
 
 			mc.angle_dWPP_time_series = []
 
 			# for every time step
-			for i in range(len(mc.dWPP_time_series)):
+			for i in range(len(mc.dWPP_time_series[TPRE:])):
 				angle_dWPP_arr = []
 
 				# for every layer
 				for j in range(len(mc.layers)-1):
+					# print("j", j)
 					if j == 0:
-						r_in = mc.input[0]
+						r_in = r0
 					else:
-						r_in = mc.rP_breve_time_series[i][j-1]
+						r_in = mc.rP_breve_time_series[TPRE:][i][j-1]
 
 					# construct weight update for BP net
 
 					# for output layer
+					# print(j, len(r_int), len(mc.rP_breve_time_series))
+					# print(len(mc.dWPP_time_series[TPRE:]), len(mc.error_time_series))
 					dWPP_BP = np.outer(mc.error_time_series[i], r_in)
 
 					# multiply phi' @ W.T from left
 					for k in range(len(mc.layers)-2, j, -1):
-						dWPP_BP = np.diag(d_activation_list[k-1](mc.uP_breve_time_series[i][k-1])) @ mc.WPP_time_series[i][k].T @ dWPP_BP
+						# print(j, k)
+						dWPP_BP = np.diag(d_activation_list[k-1](mc.uP_breve_time_series[TPRE:][i][k-1])) @ mc.WPP_time_series[TPRE:][i][k].T @ dWPP_BP
 
-					cos = cos_sim(mc.dWPP_time_series[i][j], dWPP_BP)
+					cos = cos_sim(mc.dWPP_time_series[TPRE:][i][j], -dWPP_BP)
 
 					angle_dWPP_arr.append(deg(cos))
 					# print(angle_dWPP_arr[-1])

@@ -106,6 +106,11 @@ class base_model:
 		self.BPP = deepcopy_array(BPP_init)
 		self.BPI = deepcopy_array(BPI_init)
 
+		self.dWPP = [np.zeros(shape=WPP.shape) for WPP in self.WPP]
+		self.dWIP = [np.zeros(shape=WIP.shape) for WIP in self.WIP]
+		self.dBPP = [np.zeros(shape=BPP.shape) for BPP in self.BPP]
+		self.dBPI = [np.zeros(shape=BPI.shape) for BPI in self.BPI]
+
 		if self.model == "BP":
 			self.set_weights(BPP = [WPP.T for WPP in self.WPP[1:]])
 
@@ -135,6 +140,8 @@ class base_model:
 		self.rI_breve = [self.activation[-1](self.uI_breve[-1])]
 
 		self.r0 = np.zeros(self.layers[0])
+
+		self.dWPP_r_low_pass = False
 
 	def init_record(self, rec_per_steps=1, rec_MSE=False, rec_error=False,
 		rec_WPP=False, rec_WIP=False, rec_BPP=False, rec_BPI=False,
@@ -491,23 +498,45 @@ class base_model:
 		self.dBPP = [np.zeros(shape=BPP.shape) for BPP in self.BPP]
 		self.dBPI = [np.zeros(shape=BPI.shape) for BPI in self.BPI]
 
-		# input layer
-		if r0 is not None:
-			# print("updating WPP0")
-			self.dWPP[0] = self.dt * self.eta_fw[0] * np.outer(
-					self.rP_breve[0] - self.activation[0](self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[0]),
-													self.r0_old)
-		# hidden layers
-		for i in range(1, len(self.WPP)-1):
-			# print(f"updating WPP{i}")
-			self.dWPP[i] = self.dt * self.eta_fw[i] * np.outer(
-					self.rP_breve[i] - self.activation[i](self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[i]),
-													self.rP_breve_old[i-1])
-		# output layer
-		# print("updating WPP-1")
-		self.dWPP[-1] = self.dt * self.eta_fw[-1] * np.outer(
-					self.rP_breve[-1] - self.activation[-1](self.gbas / (self.gl + self.gbas) * self.vbas_old[-1]),
-													self.rP_breve_old[-2])
+		if self.dWPP_r_low_pass:
+			if r0 is not None:
+				self.r0_LO_old += self.dt / self.tausyn * (self.r0_old - self.r0_LO_old)
+				# print("updating WPP0")
+				self.dWPP[0] = self.dt * self.eta_fw[0] * np.outer(
+						self.rP_breve[0] - self.activation[0](self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[0]),
+														self.r0_LO_old)
+
+			for i in range(1, len(self.WPP)-1):
+				self.r_LO_old[i] += self.dt / self.tausyn * (self.rP_breve_old[i] - self.r_LO_old[i])
+				# hidden layers
+				# print(f"updating WPP{i}")
+				self.dWPP[i] = self.dt * self.eta_fw[i] * np.outer(
+						self.rP_breve[i] - self.activation[i](self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[i]),
+														self.r_LO_old[i-1])
+			# output layer
+			# print("updating WPP-1")
+			self.dWPP[-1] = self.dt * self.eta_fw[-1] * np.outer(
+						self.rP_breve[-1] - self.activation[-1](self.gbas / (self.gl + self.gbas) * self.vbas_old[-1]),
+														self.r_LO_old[-2])
+
+		else:
+			# input layer
+			if r0 is not None:
+				# print("updating WPP0")
+				self.dWPP[0] = self.dt * self.eta_fw[0] * np.outer(
+						self.rP_breve[0] - self.activation[0](self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[0]),
+														self.r0_old)
+			# hidden layers
+			for i in range(1, len(self.WPP)-1):
+				# print(f"updating WPP{i}")
+				self.dWPP[i] = self.dt * self.eta_fw[i] * np.outer(
+						self.rP_breve[i] - self.activation[i](self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[i]),
+														self.rP_breve_old[i-1])
+			# output layer
+			# print("updating WPP-1")
+			self.dWPP[-1] = self.dt * self.eta_fw[-1] * np.outer(
+						self.rP_breve[-1] - self.activation[-1](self.gbas / (self.gl + self.gbas) * self.vbas_old[-1]),
+														self.rP_breve_old[-2])
 
 		"""
 			plasticity of WIP
@@ -525,7 +554,7 @@ class base_model:
 
 		for i in range(0, len(self.BPI)):
 			if self.eta_PI[i] != 0:
-				self.dBPI[i] = self.dt * self.eta_PI[i] * np.outer(-self.vapi[i], self.rI_breve_old[-1])
+				self.dBPI[i] = self.dt * self.eta_PI[i] * np.outer(-self.vapi_old[i], self.rI_breve_old[-1])
 
 		"""
 			plasticity of BPP
@@ -547,7 +576,7 @@ class base_model:
 
 class noise_model(base_model):
 	""" This class inherits all properties from the base model class and adds the function to add noise """
-	def __init__(self, dt, dtxi, tausyn, Tpres, noise_scale, alpha, inter_low_pass, pyr_hi_pass, dWPP_low_pass, gate_regularizer,
+	def __init__(self, dt, dtxi, tausyn, Tpres, noise_scale, alpha, inter_low_pass, pyr_hi_pass, dWPP_low_pass, dWPP_r_low_pass, gate_regularizer,
 					noise_type, noise_mode,
 					model, activation, layers,
 					uP_init, uI_init, WPP_init, WIP_init, BPP_init, BPI_init,
@@ -584,6 +613,7 @@ class noise_model(base_model):
 		self.pyr_hi_pass = pyr_hi_pass
 		# whether to low-pass filter updates of WPP
 		self.dWPP_low_pass = dWPP_low_pass
+		self.dWPP_r_low_pass = dWPP_r_low_pass
 		# whether to gate application of the regularizer
 		self.gate_regularizer = gate_regularizer
 		# noise time scale
@@ -610,6 +640,8 @@ class noise_model(base_model):
 
 		# init a low-pass filtered version of dWPP
 		self.dWPP_LO = [np.zeros(shape=WPP.shape) for WPP in self.WPP]
+		self.r0_LO_old = np.zeros(shape=layers[0])
+		self.r_LO_old = [np.zeros(shape=rP_breve.shape) for rP_breve in self.rP_breve]
 
 		# regularizer for backward weights
 		self.alpha = alpha
@@ -790,6 +822,10 @@ class noise_model(base_model):
 			# 			if self.epsilon_LO[layer] > 1/2 * (1 - np.cos(self.noise_deg * np.pi/180)):
 			# 				white_noise = noise_scale[layer] * self.epsilon_LO[layer] * np.array([np.random.normal(0, np.abs(x)) for x in self.uP[layer]])
 
+			elif self.noise_mode == 'const':
+				# add noise with magnitude of rescaled uP
+				white_noise = noise_scale[layer] * np.random.normal(0, 1, size=self.uP[layer].shape)
+
 			elif self.noise_mode == 'uP':
 				# add noise with magnitude of rescaled uP
 				white_noise = noise_scale[layer] * np.array([np.random.normal(0, np.abs(x)) for x in self.uP[layer]])
@@ -802,7 +838,7 @@ class noise_model(base_model):
 			if self.noise_type == 'hold_white_noise':
 				self.noise[layer] = white_noise
 			elif self.noise_type == 'OU':
-				self.noise[layer] += 1 / (self.tauxi) * (- self.dt * self.noise[layer] + np.sqrt(self.dt) * white_noise)
+				self.noise[layer] += 1 / (self.tauxi) * (- self.dt * self.noise[layer] + np.sqrt(self.dt * self.tauxi) * white_noise)
 			
 			self.noise_counter = 0
 

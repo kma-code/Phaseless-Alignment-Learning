@@ -290,7 +290,7 @@ def plot(MC_list, MC_teacher=None, path=None):
 		for i in range(len(MC_list[0].angle_dWPP_time_series[0])):
 			fig = plt.figure()
 			for mc, c in zip(MC_list, color):
-				plt.plot([vec[i] for vec in mc.angle_dWPP_time_series[TPRE:]], c=c)
+				plt.plot([vec[i] for vec in mc.angle_dWPP_time_series], c=c)
 			plt.title("$\\angle (\\Delta W^\\mathrm{PP}, \\mathrm{BP})$ layer " + str(i+1))
 			plt.ylabel("deg")
 			plt.grid()
