@@ -507,13 +507,14 @@ class base_model:
 														self.r0_LO_old)
 
 			for i in range(1, len(self.WPP)-1):
-				self.r_LO_old[i] += self.dt / self.tausyn * (self.rP_breve_old[i] - self.r_LO_old[i])
+				self.r_LO_old[i-1] += self.dt / self.tausyn * (self.rP_breve_old[i-1] - self.r_LO_old[i-1])
 				# hidden layers
 				# print(f"updating WPP{i}")
 				self.dWPP[i] = self.dt * self.eta_fw[i] * np.outer(
 						self.rP_breve[i] - self.activation[i](self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[i]),
 														self.r_LO_old[i-1])
 			# output layer
+			self.r_LO_old[-2] += self.dt / self.tausyn * (self.rP_breve_old[-2] - self.r_LO_old[-2])
 			# print("updating WPP-1")
 			self.dWPP[-1] = self.dt * self.eta_fw[-1] * np.outer(
 						self.rP_breve[-1] - self.activation[-1](self.gbas / (self.gl + self.gbas) * self.vbas_old[-1]),
