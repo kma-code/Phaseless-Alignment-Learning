@@ -31,6 +31,7 @@ def run(mc, learn=True, teacher=False):
 		rec_rI_breve=mc.rec_rI_breve,
 		rec_rP_breve=mc.rec_rP_breve,
 		rec_rP_breve_HI=mc.rec_rP_breve_HI,
+		rec_vbas=mc.rec_vbas,
 		rec_vapi=mc.rec_vapi,
 		rec_vapi_noise=mc.rec_vapi_noise,
 		rec_epsilon=mc.rec_epsilon,
