@@ -500,21 +500,21 @@ class base_model:
 
 		if self.dWPP_r_low_pass:
 			if r0 is not None:
-				self.r0_LO_old += self.dt / self.tausyn * (self.r0_old - self.r0_LO_old)
+				self.r0_LO_old += self.dt / self.tauLO * (self.r0_old - self.r0_LO_old)
 				# print("updating WPP0")
 				self.dWPP[0] = self.dt * self.eta_fw[0] * np.outer(
 						self.rP_breve[0] - self.activation[0](self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[0]),
 														self.r0_LO_old)
 
 			for i in range(1, len(self.WPP)-1):
-				self.r_LO_old[i-1] += self.dt / self.tausyn * (self.rP_breve_old[i-1] - self.r_LO_old[i-1])
+				self.r_LO_old[i-1] += self.dt / self.tauLO * (self.rP_breve_old[i-1] - self.r_LO_old[i-1])
 				# hidden layers
 				# print(f"updating WPP{i}")
 				self.dWPP[i] = self.dt * self.eta_fw[i] * np.outer(
 						self.rP_breve[i] - self.activation[i](self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[i]),
 														self.r_LO_old[i-1])
 			# output layer
-			self.r_LO_old[-2] += self.dt / self.tausyn * (self.rP_breve_old[-2] - self.r_LO_old[-2])
+			self.r_LO_old[-2] += self.dt / self.tauLO * (self.rP_breve_old[-2] - self.r_LO_old[-2])
 			# print("updating WPP-1")
 			self.dWPP[-1] = self.dt * self.eta_fw[-1] * np.outer(
 						self.rP_breve[-1] - self.activation[-1](self.gbas / (self.gl + self.gbas) * self.vbas_old[-1]),
@@ -577,7 +577,7 @@ class base_model:
 
 class noise_model(base_model):
 	""" This class inherits all properties from the base model class and adds the function to add noise """
-	def __init__(self, dt, dtxi, tausyn, Tpres, noise_scale, alpha, inter_low_pass, pyr_hi_pass, dWPP_low_pass, dWPP_r_low_pass, gate_regularizer,
+	def __init__(self, dt, dtxi, tauHP, tauLO, Tpres, noise_scale, alpha, inter_low_pass, pyr_hi_pass, dWPP_low_pass, dWPP_r_low_pass, gate_regularizer,
 					noise_type, noise_mode,
 					model, activation, layers,
 					uP_init, uI_init, WPP_init, WIP_init, BPP_init, BPI_init,
@@ -622,7 +622,8 @@ class noise_model(base_model):
 		# decimals of dt
 		self.dt_decimals = np.int(np.round(-np.log10(self.dt)))
 		# synaptic time constant (sets the low-pass filter of interneuron)
-		self.tausyn = tausyn
+		self.tauHP = tauHP
+		self.tauLO = tauLO
 		# gaussian noise properties
 		self.noise_scale = noise_scale
 		self.noise = [np.zeros(shape=uP.shape) for uP in self.uP]
@@ -831,6 +832,10 @@ class noise_model(base_model):
 				# add noise with magnitude of rescaled uP
 				white_noise = noise_scale[layer] * np.array([np.random.normal(0, np.abs(x)) for x in self.uP[layer]])
 
+			elif self.noise_mode == 'uP_breve':
+				# add noise with magnitude of rescaled uP_breve
+				white_noise = noise_scale[layer] * np.array([np.random.normal(0, np.abs(x)) for x in self.uP_breve[layer]])
+
 			elif self.noise_mode == 'vapi':
 				# add noise with magnitude of rescaled vapi
 				white_noise = noise_scale[layer] * np.array([np.random.normal(0, np.abs(x)) for x in self.vapi[layer]])
@@ -852,8 +857,8 @@ class noise_model(base_model):
 
 		# we will only need rP_breve_HI coming from the final layer, so we freeze the others
 		# for i in range(len(self.rP_breve)):
-		#       self.rP_breve_HI[i] += (self.rP_breve[i] - self.rP_breve_old[i]) - self.dt / self.tausyn * self.rP_breve_HI[i]
-		self.rP_breve_HI[-1] += (self.rP_breve[-1] - self.rP_breve_old[-1]) - self.dt / self.tausyn * self.rP_breve_HI[-1]
+		#       self.rP_breve_HI[i] += (self.rP_breve[i] - self.rP_breve_old[i]) - self.dt / self.tauHP * self.rP_breve_HI[i]
+		self.rP_breve_HI[-1] += (self.rP_breve[-1] - self.rP_breve_old[-1]) - self.dt / self.tauHP * self.rP_breve_HI[-1]
 
 		return self.rP_breve_HI
 
@@ -863,7 +868,7 @@ class noise_model(base_model):
 		# Low-pass has the form d v_out =  dt/tau (v_in - v_out)
 
 		for i in range(len(self.dWPP_LO)):
-		      self.dWPP_LO[i] += self.dt / self.tausyn * (self.dWPP[i] - self.dWPP_LO[i])
+		      self.dWPP_LO[i] += self.dt / self.tauLO * (self.dWPP[i] - self.dWPP_LO[i])
 
 		return self.dWPP_LO
 
@@ -887,7 +892,7 @@ class noise_model(base_model):
 
 		# add slow response to dendritic compartment of interneurons
 		if self.inter_low_pass:
-			self.vden[0] += self.dt / self.tausyn * (self.calc_vden(self.rP_breve[-2], self.WIP[-1]) - self.vden[0])
+			self.vden[0] += self.dt / self.tauLO * (self.calc_vden(self.rP_breve[-2], self.WIP[-1]) - self.vden[0])
 		else:
 			# else, instant response
 			self.vden[0] = self.calc_vden(self.rP_breve[-2], self.WIP[-1])
