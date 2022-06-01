@@ -31,6 +31,7 @@ def run(mc, learn=True, teacher=False):
 		rec_rI_breve=mc.rec_rI_breve,
 		rec_rP_breve=mc.rec_rP_breve,
 		rec_rP_breve_HI=mc.rec_rP_breve_HI,
+		rec_vbas=mc.rec_vbas,
 		rec_vapi=mc.rec_vapi,
 		rec_vapi_noise=mc.rec_vapi_noise,
 		rec_epsilon=mc.rec_epsilon,
@@ -75,6 +76,7 @@ def training(mc, r0_arr, epochs=1, learn=True, teacher=False):
 			# if target has been defined, use that
 			elif hasattr(mc, 'target'):
 				mc.evolve_system(r0=r0_arr[i], u_tgt=[mc.target[i]], learn_weights=learn, learn_bw_weights=learn)
+				mc.set_weights(BPI=[-mat for mat in mc.BPP])
 			else:
 				mc.evolve_system(r0=r0_arr[i], learn_weights=learn, learn_bw_weights=learn)
 	return mc

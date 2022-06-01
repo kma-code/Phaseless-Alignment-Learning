@@ -80,15 +80,22 @@ def compare_jacobians(MC_list, model):
 
 				# for every hidden layer
 				for j in range(len(mc.layers)-2):
-					
-					# construct Jacobian J_f^T
-					J_f_T = np.eye(mc.layers[-1])
-					# multiply phi' @ W.T from left
-					for k in range(len(mc.layers)-2, j, -1):
-						J_f_T = np.diag(d_activation_list[k-1](mc.uP_breve_time_series[i][k-1])) @ mc.WPP_time_series[i][k].T @ J_f_T
 
-					# construct Jacobian J_g
-					J_g = mc.BPP_time_series[i][j] @ np.diag(d_activation_list[-1](mc.uP_breve_time_series[i][-1]))
+					if MC_list[0].bw_connection_mode == 'skip':
+						# construct Jacobian J_f^T
+						J_f_T = np.eye(mc.layers[-1])
+						# multiply phi' @ W.T from left
+						for k in range(len(mc.layers)-2, j, -1):
+							J_f_T = np.diag(d_activation_list[k-1](mc.gbas / (mc.gbas + mc.gl) * mc.vbas_time_series[i][k-1])) @ mc.WPP_time_series[i][k].T @ J_f_T
+
+						# construct Jacobian J_g
+						J_g = mc.BPP_time_series[i][j] @ np.diag(d_activation_list[-1](mc.gbas / (mc.gbas + mc.gl) * mc.vbas_time_series[i][-1]))
+
+					elif MC_list[0].bw_connection_mode == 'layered':
+						J_f_T = np.diag(d_activation_list[j](mc.gbas / (mc.gbas + mc.gl) * mc.vbas_time_series[i][j])) @ mc.WPP_time_series[i][j+1].T
+						J_g   = mc.BPP_time_series[i][j] @ np.diag(d_activation_list[j+1](mc.gbas / (mc.gbas + mc.gl) * mc.vbas_time_series[i][j+1]))
+
+					
 
 					cos = cos_sim(J_g, J_f_T)
 

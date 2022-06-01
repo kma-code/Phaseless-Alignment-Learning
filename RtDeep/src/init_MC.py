@@ -15,13 +15,14 @@ function_mappings = {
 # defines the voltage inits
 def init_voltages(layers, seed):
 
-	np.random.seed(seed)
 
 	uP_init = []
 	for i in range(1, len(layers)):
 	    uP_init.append(np.random.normal(0, 1, size=layers[i]))
 
-	uI_init = [np.random.normal(0, 1, size=layers[-1])]
+	uI_init = []
+	for i in range(1, len(layers)-1):
+	    uI_init.append(np.random.normal(0, 1, size=layers[i+1]))
 
 	return uP_init, uI_init
 		
@@ -29,26 +30,26 @@ def init_voltages(layers, seed):
 # defines the weight inits
 def init_weights(layers, WPP_range, WIP_range, BPP_range, BPI_range, seed):
 
-	np.random.seed(seed)
 
 	# forward pp weights: connects all layers k, k+1
 	WPP_init = []
 	for i in range(len(layers)-1):
 	    WPP_init.append(np.random.uniform(WPP_range[0], WPP_range[1], size=(layers[i+1], layers[i])))
-	    
-	# p to inter: connects N-1 to N
-	WIP_init = [np.random.uniform(WIP_range[0], WIP_range[1], size=(layers[-1], layers[-2]))]
 
-	# backwards p to p: connects N to k
+	# p to inter: connects k to k
+	WIP_init = []
+	for i in range(1, len(layers)-1):
+	    WIP_init.append(np.random.uniform(WIP_range[0], WIP_range[1], size=(layers[i+1], layers[i])))
+
+	# backwards p to p: connects k+1 to k
 	BPP_init = []
 	for i in range(1, len(layers)-1):
-	    BPP_init.append(np.random.uniform(BPP_range[0], BPP_range[1], size=(layers[i], layers[-1])))
-	    # BPP_init.append(np.linalg.pinv(WPP_init[i]))
+	    BPP_init.append(np.random.uniform(BPP_range[0], BPP_range[1], size=(layers[i], layers[i+1])))
 
-	# backwards inter to p: connects N to k
+	# backwards inter to p: connects k to k
 	BPI_init = []
 	for i in range(1, len(layers)-1):
-	    BPI_init.append(np.random.uniform(BPI_range[0], BPI_range[1], size=(layers[i], layers[-1])))
+	    BPI_init.append(np.random.uniform(BPI_range[0], BPI_range[1], size=(layers[i], layers[i+1])))
 
 
 	return WPP_init, WIP_init, BPP_init, BPI_init
@@ -66,15 +67,27 @@ def init_MC(params, seeds, teacher=False):
 
 	for seed in seeds:
 
-		uP_init, uI_init = init_voltages(params["layers"], seed)
-		WPP_init, WIP_init, BPP_init, BPI_init = init_weights(
-			params["layers"],
-			params["init_WPP_range"],
-			params["init_WIP_range"],
-			params["init_BPP_range"],
-			params["init_BPI_range"],
-			seed
-			)
+		if teacher:
+			uP_init, uI_init = init_voltages(params["layers"], seed)
+			WPP_init, WIP_init, BPP_init, BPI_init = init_weights(
+				params["layers"],
+				params["init_teacher_WPP_range"],
+				params["init_teacher_WIP_range"],
+				params["init_teacher_BPP_range"],
+				params["init_teacher_BPI_range"],
+				seed
+				)
+
+		else:
+			uP_init, uI_init = init_voltages(params["layers"], seed)
+			WPP_init, WIP_init, BPP_init, BPI_init = init_weights(
+				params["layers"],
+				params["init_WPP_range"],
+				params["init_WIP_range"],
+				params["init_BPP_range"],
+				params["init_BPI_range"],
+				seed
+				)
 
 		# if a list of activations has been passed, use it
 		if isinstance(params["activation"], list):
@@ -86,6 +99,9 @@ def init_MC(params, seeds, teacher=False):
 		if params["model_type"] in ["BP", "FA"]:
 			MC_list.append(
 				base_model(
+					seed=seed,
+					bw_connection_mode='layered',
+					dWPP_use_activation=params["dWPP_use_activation"],
 					dt=params["dt"],
 					Tpres=params["Tpres"],
 					model=params["model_type"],
@@ -120,9 +136,13 @@ def init_MC(params, seeds, teacher=False):
 
 			MC_list.append(
 				noise_model(
+					seed=seed,
+					bw_connection_mode='layered',
+					dWPP_use_activation=params["dWPP_use_activation"],
 					dt=params["dt"],
 					dtxi=params["dtxi"],
-					tausyn=params["tausyn"],
+					tauHP=params["tauHP"],
+					tauLO=params["tauLO"],
 					Tpres=params["Tpres"],
 					noise_scale=params["noise_scale"],
 					alpha=params["alpha"],
@@ -197,8 +217,9 @@ def init_MC(params, seeds, teacher=False):
 		MC_list[-1].rec_uI_breve=params["rec_uI_breve"]
 		MC_list[-1].rec_rI_breve=params["rec_rI_breve"]
 		MC_list[-1].rec_vapi=params["rec_vapi"]
+		MC_list[-1].rec_vbas=params["rec_vbas"]
 		# some variables only exist in DTPDRL
-		if params["model_type"] in ["DTPDRL"]:
+		if params["model_type"] in ["LDRL", "DTPDRL"]:
 			MC_list[-1].rec_rP_breve_HI=params["rec_rP_breve_HI"]
 			MC_list[-1].rec_vapi_noise=params["rec_vapi_noise"]
 			MC_list[-1].rec_noise=params["rec_noise"]

@@ -34,6 +34,7 @@ def plot(MC_list, MC_teacher=None, path=None):
 		fig = plt.figure()
 		for mc, c in zip(MC_list, color):
 			plt.plot(moving_average(mc.MSE_time_series, int(10*mc.Tpres/mc.dt/mc.rec_per_steps)), c=c)
+			# plt.plot(mc.MSE_time_series, c=c)
 
 		plt.title("MSE (window over $10\\;T_\\mathrm{pres}$)")
 		plt.yscale('log')
@@ -104,6 +105,24 @@ def plot(MC_list, MC_teacher=None, path=None):
 			plt.xlabel(str(MC_list[0].rec_per_steps) + ' dt')
 			file_name = 'BPI_layer'+str(i+1)+'.png'
 			plt.savefig(PATH + file_name, dpi=200)
+
+	if MC_list[0].rec_BPI and MC_list[0].rec_BPP:
+
+		for i in range(len(MC_list[0].BPI)):
+				fig = plt.figure()
+				for mc, c in zip(MC_list, color):
+					for j in range(len(mc.BPI_time_series[0][i])):
+						vec1 = np.array([vec[i][j] for vec in mc.BPI_time_series[TPRE:]])
+						vec2 = np.array([vec[i][j] for vec in mc.BPP_time_series[TPRE:]])
+						plt.plot(vec1+vec2, c=c)
+						# if MC_teacher is not None:
+						# 	plt.plot(np.array([MC_teacher[0].BPI[i][j] for vec in MC_list[0].BPI_time_series[TPRE:]]), c=CLR_TEACH, ls='--')
+				plt.title("$B^\\mathrm{PI}$ layer " + str(i+1))
+				# plt.grid()
+				# plt.ylim(0,1)
+				plt.xlabel(str(MC_list[0].rec_per_steps) + ' dt')
+				file_name = 'BPP+BPI_layer'+str(i+1)+'.png'
+				plt.savefig(PATH + file_name, dpi=200)
 
 
 

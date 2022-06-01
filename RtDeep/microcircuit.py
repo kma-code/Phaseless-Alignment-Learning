@@ -70,10 +70,17 @@ def moving_average(x, w):
 class base_model:
 	""" This class implements a generic microcircuit model """
 
-	def __init__(self, dt, Tpres, model, activation, layers,
+	def __init__(self, bw_connection_mode, dWPP_use_activation, dt, Tpres, model, activation, layers,
 					uP_init, uI_init, WPP_init, WIP_init, BPP_init, BPI_init,
 					gl, gden, gbas, gapi, gnI, gntgt,
-					eta_fw, eta_bw, eta_PI, eta_IP):
+					eta_fw, eta_bw, eta_PI, eta_IP, seed=123):
+
+		self.rng = np.random.RandomState(seed)
+
+		# connection_mode: skip or layered
+		self.bw_connection_mode = bw_connection_mode
+		# whether to use activation in updates of WPP
+		self.dWPP_use_activation = dWPP_use_activation
 
 		self.model = model # FA, BP or PBP
 		self.layers = layers
@@ -97,9 +104,9 @@ class base_model:
 		self.vden = [np.zeros_like(uI) for uI in self.uI]
 		self.vapi = [np.zeros_like(uP) for uP in self.uP[:-1]]
 		# and make copies
-		self.vbas_old = [np.zeros_like(uP) for uP in self.uP]
-		self.vden_old = [np.zeros_like(uI) for uI in self.uI]
-		self.vapi_old = [np.zeros_like(uP) for uP in self.uP[:-1]]
+		self.vbas_old = deepcopy_array(self.vbas)
+		self.vden_old = deepcopy_array(self.vden)
+		self.vapi_old = deepcopy_array(self.vapi)
 
 		self.WPP = deepcopy_array(WPP_init)
 		self.WIP = deepcopy_array(WIP_init)
@@ -137,7 +144,7 @@ class base_model:
 		self.uI_breve = [self.prospective_voltage(self.uI[i], self.uI_old[i], self.taueffI[i]) for i in range(len(self.uI))]
 		# calculate rate of lookahead: phi(ubreve)
 		self.rP_breve = [self.activation[i](self.uP_breve[i]) for i in range(len(self.uP_breve))]
-		self.rI_breve = [self.activation[-1](self.uI_breve[-1])]
+		self.rI_breve = [self.activation[i+1](self.uI_breve[i]) for i in range(len(self.uI_breve))]
 
 		self.r0 = np.zeros(self.layers[0])
 
@@ -147,7 +154,7 @@ class base_model:
 		rec_WPP=False, rec_WIP=False, rec_BPP=False, rec_BPI=False,
 		rec_dWPP=False, rec_dWIP=False, rec_dBPP=False, rec_dBPI=False,
 		rec_uP=False, rec_uP_breve=False, rec_rP_breve=False, rec_rP_breve_HI=False, rec_uI=False, rec_uI_breve=False, rec_rI_breve=False,
-		rec_vapi=False, rec_vapi_noise=False, rec_noise=False, rec_epsilon=False, rec_epsilon_LO=False):
+		rec_vbas=False, rec_vapi=False, rec_vapi_noise=False, rec_noise=False, rec_epsilon=False, rec_epsilon_LO=False):
 		# records the values of the variables given in var_array
 		# e.g. WPP, BPP, uP_breve
 		# rec_per_steps sets after how many steps data is recorded
@@ -187,6 +194,8 @@ class base_model:
 			self.uI_breve_time_series = []
 		if rec_rI_breve:
 			self.rI_breve_time_series = []
+		if rec_vbas:
+			self.vbas_time_series = []
 		if rec_vapi:
 			self.vapi_time_series = []
 		if rec_vapi_noise:
@@ -241,6 +250,8 @@ class base_model:
 			self.uI_breve_time_series.append(copy.deepcopy(self.uI_breve))
 		if hasattr(self, 'rI_breve_time_series'):
 			self.rI_breve_time_series.append(copy.deepcopy(self.rI_breve))
+		if hasattr(self, 'vbas_time_series'):
+			self.vbas_time_series.append(copy.deepcopy(self.vbas))
 		if hasattr(self, 'vapi_time_series'):
 			self.vapi_time_series.append(copy.deepcopy(self.vapi))
 		if hasattr(self, 'vapi_noise_time_series'):
@@ -264,7 +275,9 @@ class base_model:
 		# tau_eff for output layer in absence of target
 		taueffP_notgt = [1 / (self.gl + self.gbas)]
 
-		taueffI = [1 / (self.gl + self.gden + self.gnI)]
+		taueffI = []
+		for i in self.uI:
+			taueffI.append([1 / (self.gl + self.gden + self.gnI)])
 
 		return taueffP, taueffP_notgt, taueffI
 
@@ -292,9 +305,11 @@ class base_model:
 	def set_self_predicting_state(self):
 
 		# set WIP and BPI to values corresponding to self-predicting state
-		for i in range(0, len(self.BPI)):
-			self.BPI[i] = - self.BPP[i].copy()
-		self.WIP[-1] = self.gbas * (self.gl + self.gden) / (self.gden * (self.gl + self.gbas)) * self.WPP[-1].copy()
+		for i in range(len(self.BPP)):
+				self.BPI[i] = - self.BPP[i].copy()
+
+		for i in range(len(self.WIP)):
+			self.WIP[i] = self.gbas * (self.gl + self.gden) / (self.gden * (self.gl + self.gbas)) * self.WPP[i+1].copy()
 
 	def get_voltages(self):
 		return self.uP, self.uI
@@ -380,7 +395,7 @@ class base_model:
 		for i in range(len(self.duP)):
 			self.uP[i] += self.duP[i]
 		for i in range(len(self.duI)):
-			self.uI [i]+= self.duI[i]
+			self.uI[i] += self.duI[i]
 
 		if learn_weights:
 			for i in range(len(self.dWPP)):
@@ -421,7 +436,7 @@ class base_model:
 		self.uI_breve = [self.prospective_voltage(self.uI[i], self.uI_old[i], self.taueffI[i]) for i in range(len(self.uI))]
 		# calculate rate of lookahead: phi(ubreve)
 		self.rP_breve = [self.activation[i](self.uP_breve[i]) for i in range(len(self.uP_breve))]
-		self.rI_breve = [self.activation[-1](self.uI_breve[-1])]
+		self.rI_breve = [self.activation[i+1](self.uI_breve[i]) for i in range(len(self.uI_breve))]
 		self.r0 = r0
 
 		# before modifying uP and uI, we need to save copies
@@ -444,10 +459,17 @@ class base_model:
 		for i in range(1, len(self.layers)-1):
 			self.vbas[i] = self.calc_vbas(self.rP_breve[i-1], self.WPP[i])
 
-		self.vden[0] = self.calc_vden(self.rP_breve[-2], self.WIP[-1])
+		for i in range(len(self.WIP)):
+			if self.bw_connection_mode == 'skip':
+				self.vden[0] = self.calc_vden(self.rP_breve[-2], self.WIP[-1])
+			elif self.bw_connection_mode == 'layered':
+				self.vden[i] = self.calc_vden(self.rP_breve[i], self.WIP[i])
 
-		for i in range(0, len(self.layers)-2):
-			self.vapi[i] = self.calc_vapi(self.rP_breve[-1], self.BPP[i], self.rI_breve[-1], self.BPI[i])
+		for i in range(len(self.layers)-2):
+			if self.bw_connection_mode == 'skip':
+				self.vapi[i] = self.calc_vapi(self.rP_breve[-1], self.BPP[i], self.rI_breve[-1], self.BPI[i])
+			elif self.bw_connection_mode == 'layered':
+				self.vapi[i] = self.calc_vapi(self.rP_breve[i+1], self.BPP[i], self.rI_breve[i], self.BPI[i])
 
 		return self.vbas, self.vapi, self.vden
 
@@ -461,9 +483,10 @@ class base_model:
 		"""
 
 		# update somatic potentials
-		ueffI = self.taueffI[-1] * (self.gden * self.vden[-1] + self.gnI * self.uP_breve[-1])
-		delta_uI = (ueffI - self.uI[-1]) / self.taueffI[-1]
-		self.duI[-1] = self.dt * delta_uI
+		for i in range(len(self.uI)):
+			ueffI = self.taueffI[i] * (self.gden * self.vden[i] + self.gnI * self.uP_breve[i+1])
+			delta_uI = (ueffI - self.uI[i]) / self.taueffI[i]
+			self.duI[i] = self.dt * delta_uI
 
 		for i in range(0, len(self.layers)-2):
 			ueffP = self.taueffP[i] * (self.gbas * self.vbas[i] + self.gapi * self.vapi[i])
@@ -498,55 +521,110 @@ class base_model:
 		self.dBPP = [np.zeros(shape=BPP.shape) for BPP in self.BPP]
 		self.dBPI = [np.zeros(shape=BPI.shape) for BPI in self.BPI]
 
-		if self.dWPP_r_low_pass:
-			if r0 is not None:
-				self.r0_LO_old += self.dt / self.tauLO * (self.r0_old - self.r0_LO_old)
-				# print("updating WPP0")
-				self.dWPP[0] = self.dt * self.eta_fw[0] * np.outer(
-						self.rP_breve[0] - self.activation[0](self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[0]),
-														self.r0_LO_old)
+		if self.dWPP_use_activation:
 
-			for i in range(1, len(self.WPP)-1):
-				self.r_LO_old[i-1] += self.dt / self.tauLO * (self.rP_breve_old[i-1] - self.r_LO_old[i-1])
+			if self.dWPP_r_low_pass:
+				if r0 is not None:
+					self.r0_LO_old += self.dt / self.tauLO * (self.r0_old - self.r0_LO_old)
+					# print("updating WPP0")
+					self.dWPP[0] = self.dt * self.eta_fw[0] * np.outer(
+							self.rP_breve[0] - self.activation[0](self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[0]),
+															self.r0_LO_old)
+
+				for i in range(1, len(self.WPP)-1):
+					self.r_LO_old[i-1] += self.dt / self.tauLO * (self.rP_breve_old[i-1] - self.r_LO_old[i-1])
+					# hidden layers
+					# print(f"updating WPP{i}")
+					self.dWPP[i] = self.dt * self.eta_fw[i] * np.outer(
+							self.rP_breve[i] - self.activation[i](self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[i]),
+															self.r_LO_old[i-1])
+				# output layer
+				self.r_LO_old[-2] += self.dt / self.tauLO * (self.rP_breve_old[-2] - self.r_LO_old[-2])
+				# print("updating WPP-1")
+				self.dWPP[-1] = self.dt * self.eta_fw[-1] * np.outer(
+							self.rP_breve[-1] - self.activation[-1](self.gbas / (self.gl + self.gbas) * self.vbas_old[-1]),
+															self.r_LO_old[-2])
+
+			else:
+				# input layer
+				if r0 is not None:
+					# print("updating WPP0")
+					self.dWPP[0] = self.dt * self.eta_fw[0] * np.outer(
+							self.rP_breve[0] - self.activation[0](self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[0]),
+															self.r0_old)
 				# hidden layers
-				# print(f"updating WPP{i}")
-				self.dWPP[i] = self.dt * self.eta_fw[i] * np.outer(
-						self.rP_breve[i] - self.activation[i](self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[i]),
-														self.r_LO_old[i-1])
-			# output layer
-			self.r_LO_old[-2] += self.dt / self.tauLO * (self.rP_breve_old[-2] - self.r_LO_old[-2])
-			# print("updating WPP-1")
-			self.dWPP[-1] = self.dt * self.eta_fw[-1] * np.outer(
-						self.rP_breve[-1] - self.activation[-1](self.gbas / (self.gl + self.gbas) * self.vbas_old[-1]),
-														self.r_LO_old[-2])
+				for i in range(1, len(self.WPP)-1):
+					# print(f"updating WPP{i}")
+					self.dWPP[i] = self.dt * self.eta_fw[i] * np.outer(
+							self.rP_breve[i] - self.activation[i](self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[i]),
+															self.rP_breve_old[i-1])
+				# output layer
+				# print("updating WPP-1")
+				self.dWPP[-1] = self.dt * self.eta_fw[-1] * np.outer(
+							self.rP_breve[-1] - self.activation[-1](self.gbas / (self.gl + self.gbas) * self.vbas_old[-1]),
+															self.rP_breve_old[-2])
 
 		else:
-			# input layer
-			if r0 is not None:
-				# print("updating WPP0")
-				self.dWPP[0] = self.dt * self.eta_fw[0] * np.outer(
-						self.rP_breve[0] - self.activation[0](self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[0]),
-														self.r0_old)
-			# hidden layers
-			for i in range(1, len(self.WPP)-1):
-				# print(f"updating WPP{i}")
-				self.dWPP[i] = self.dt * self.eta_fw[i] * np.outer(
-						self.rP_breve[i] - self.activation[i](self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[i]),
-														self.rP_breve_old[i-1])
-			# output layer
-			# print("updating WPP-1")
-			self.dWPP[-1] = self.dt * self.eta_fw[-1] * np.outer(
-						self.rP_breve[-1] - self.activation[-1](self.gbas / (self.gl + self.gbas) * self.vbas_old[-1]),
-														self.rP_breve_old[-2])
+
+			if self.dWPP_r_low_pass:
+				if r0 is not None:
+					self.r0_LO_old += self.dt / self.tauLO * (self.r0_old - self.r0_LO_old)
+					# print("updating WPP0")
+					self.dWPP[0] = self.dt * self.eta_fw[0] * np.outer(
+							self.uP_breve[0] - (self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[0]),
+															self.r0_LO_old)
+
+				for i in range(1, len(self.WPP)-1):
+					self.r_LO_old[i-1] += self.dt / self.tauLO * (self.rP_breve_old[i-1] - self.r_LO_old[i-1])
+					# hidden layers
+					# print(f"updating WPP{i}")
+					self.dWPP[i] = self.dt * self.eta_fw[i] * np.outer(
+							self.uP_breve[i] - (self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[i]),
+															self.r_LO_old[i-1])
+				# output layer
+				self.r_LO_old[-2] += self.dt / self.tauLO * (self.rP_breve_old[-2] - self.r_LO_old[-2])
+				# print("updating WPP-1")
+				self.dWPP[-1] = self.dt * self.eta_fw[-1] * np.outer(
+							self.uP_breve[-1] - (self.gbas / (self.gl + self.gbas) * self.vbas_old[-1]),
+															self.r_LO_old[-2])
+
+			else:
+				# input layer
+				if r0 is not None:
+					# print("updating WPP0")
+					self.dWPP[0] = self.dt * self.eta_fw[0] * np.outer(
+							self.uP_breve[0] - (self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[0]),
+															self.r0_old)
+				# hidden layers
+				for i in range(1, len(self.WPP)-1):
+					# print(f"updating WPP{i}")
+					self.dWPP[i] = self.dt * self.eta_fw[i] * np.outer(
+							self.uP_breve[i] - (self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[i]),
+															self.rP_breve_old[i-1])
+				# output layer
+				# print("updating WPP-1")
+				self.dWPP[-1] = self.dt * self.eta_fw[-1] * np.outer(
+							self.uP_breve[-1] - (self.gbas / (self.gl + self.gbas) * self.vbas_old[-1]),
+															self.rP_breve_old[-2])
+
 
 		"""
 			plasticity of WIP
 
 		"""
 
-		self.dWIP[-1] = self.dt * self.eta_IP[-1] * np.outer(
+		if self.bw_connection_mode == 'skip':
+			self.dWIP[-1] = self.dt * self.eta_IP[-1] * np.outer(
 					self.rI_breve[-1] - self.activation[-1](self.gden / (self.gl + self.gden) * self.vden_old[-1]),
 													self.rP_breve_old[-2])
+		
+
+		elif self.bw_connection_mode == 'layered':
+			for i in range(len(self.WIP)):
+				self.dWIP[i] = self.dt * self.eta_IP[i] * np.outer(
+							self.rI_breve[i] - self.activation[i+1](self.gden / (self.gl + self.gden) * self.vden_old[i]),
+															self.rP_breve_old[i])
+
 
 		"""
 			plasticity of BPI
@@ -555,7 +633,10 @@ class base_model:
 
 		for i in range(0, len(self.BPI)):
 			if self.eta_PI[i] != 0:
-				self.dBPI[i] = self.dt * self.eta_PI[i] * np.outer(-self.vapi_old[i], self.rI_breve_old[-1])
+				if self.bw_connection_mode == 'skip':
+					self.dBPI[i] = self.dt * self.eta_PI[i] * np.outer(-self.vapi_old[i], self.rI_breve_old[-1])
+				elif self.bw_connection_mode == 'layered':
+					self.dBPI[i] = self.dt * self.eta_PI[i] * np.outer(-self.vapi_old[i], self.rI_breve_old[i])
 
 		"""
 			plasticity of BPP
@@ -568,6 +649,7 @@ class base_model:
 
 		elif self.model == 'BP':
 			self.set_weights(BPP = [WPP.T for WPP in self.WPP[1:]])
+			self.set_weights(BPI = [-BPP for BPP in self.BPP])
 
 
 		return self.dWPP, self.dWIP, self.dBPP, self.dBPI 
@@ -577,22 +659,22 @@ class base_model:
 
 class noise_model(base_model):
 	""" This class inherits all properties from the base model class and adds the function to add noise """
-	def __init__(self, dt, dtxi, tauHP, tauLO, Tpres, noise_scale, alpha, inter_low_pass, pyr_hi_pass, dWPP_low_pass, dWPP_r_low_pass, gate_regularizer,
+	def __init__(self, bw_connection_mode, dWPP_use_activation, dt, dtxi, tauHP, tauLO, Tpres, noise_scale, alpha, inter_low_pass, pyr_hi_pass, dWPP_low_pass, dWPP_r_low_pass, gate_regularizer,
 					noise_type, noise_mode,
 					model, activation, layers,
 					uP_init, uI_init, WPP_init, WIP_init, BPP_init, BPI_init,
 					gl, gden, gbas, gapi, gnI, gntgt,
-					eta_fw, eta_bw, eta_PI, eta_IP, **kwargs):
+					eta_fw, eta_bw, eta_PI, eta_IP, seed=123, **kwargs):
 
 		# init base_model with same settings
-		super().__init__(dt=dt, Tpres=Tpres,
+		super().__init__(bw_connection_mode=bw_connection_mode, dWPP_use_activation=dWPP_use_activation, dt=dt, Tpres=Tpres,
 			model=model, activation=activation, layers=layers,
             uP_init=uP_init, uI_init=uI_init,
             WPP_init=WPP_init, WIP_init=WIP_init, BPP_init=BPP_init, BPI_init=BPI_init,
             gl=gl, gden=gden, gbas=gbas, gapi=gapi, gnI=gnI, gntgt=gntgt,
-            eta_fw=eta_fw, eta_bw=eta_bw, eta_PI=eta_PI, eta_IP=eta_IP)
+            eta_fw=eta_fw, eta_bw=eta_bw, eta_PI=eta_PI, eta_IP=eta_IP, seed=seed)
 
-		# new variables:
+		self.rng = np.random.RandomState(seed)
 
 		# type of noise (OU or white)
 		self.noise_type = noise_type
@@ -734,7 +816,7 @@ class noise_model(base_model):
 		self.uI_breve = [self.prospective_voltage(self.uI[i], self.uI_old[i], self.taueffI[i]) for i in range(len(self.uI))]
 		# calculate rate of lookahead: phi(ubreve)
 		self.rP_breve = [self.activation[i](self.uP_breve[i]) for i in range(len(self.uP_breve))]
-		self.rI_breve = [self.activation[-1](self.uI_breve[-1])]
+		self.rI_breve = [self.activation[i+1](self.uI_breve[i]) for i in range(len(self.uI_breve))]
 		self.r0 = r0
 
 		# before modifying uP and uI, we need to save copies
@@ -762,9 +844,10 @@ class noise_model(base_model):
 		"""
 
 		# update somatic potentials
-		ueffI = self.taueffI[-1] * (self.gden * self.vden[-1] + self.gnI * self.uP_breve[-1])
-		delta_uI = (ueffI - self.uI[-1]) / self.taueffI[-1]
-		self.duI[-1] = self.dt * delta_uI
+		for i in range(len(self.uI)):
+			ueffI = self.taueffI[i] * (self.gden * self.vden[i] + self.gnI * self.uP_breve[i+1])
+			delta_uI = (ueffI - self.uI[i]) / self.taueffI[i]
+			self.duI[i] = self.dt * delta_uI
 
 		for i in range(0, len(self.layers)-2):
 			if inject_noise:
@@ -826,19 +909,19 @@ class noise_model(base_model):
 
 			elif self.noise_mode == 'const':
 				# add noise with magnitude of rescaled uP
-				white_noise = noise_scale[layer] * np.random.normal(0, 1, size=self.uP[layer].shape)
+				white_noise = noise_scale[layer] * self.rng.normal(0, 1, size=self.uP[layer].shape)
 
 			elif self.noise_mode == 'uP':
 				# add noise with magnitude of rescaled uP
-				white_noise = noise_scale[layer] * np.array([np.random.normal(0, np.abs(x)) for x in self.uP[layer]])
+				white_noise = noise_scale[layer] * np.array([self.rng.normal(0, np.abs(x)) for x in self.uP[layer]])
 
 			elif self.noise_mode == 'uP_breve':
 				# add noise with magnitude of rescaled uP_breve
-				white_noise = noise_scale[layer] * np.array([np.random.normal(0, np.abs(x)) for x in self.uP_breve[layer]])
+				white_noise = noise_scale[layer] * np.array([self.rng.normal(0, np.abs(x)) for x in self.uP_breve[layer]])
 
 			elif self.noise_mode == 'vapi':
 				# add noise with magnitude of rescaled vapi
-				white_noise = noise_scale[layer] * np.array([np.random.normal(0, np.abs(x)) for x in self.vapi[layer]])
+				white_noise = noise_scale[layer] * np.array([self.rng.normal(0, np.abs(x)) for x in self.vapi[layer]])
 
 			# the noise will be added to vapi, depending on the mode
 			if self.noise_type == 'hold_white_noise':
@@ -855,10 +938,9 @@ class noise_model(base_model):
 		# updates the high-passed instantaneous rate rP_breve_HI which is used to update BPP
 		# High-pass has the form d v_out = d v_in - dt/tau * v_out
 
-		# we will only need rP_breve_HI coming from the final layer, so we freeze the others
-		# for i in range(len(self.rP_breve)):
-		#       self.rP_breve_HI[i] += (self.rP_breve[i] - self.rP_breve_old[i]) - self.dt / self.tauHP * self.rP_breve_HI[i]
-		self.rP_breve_HI[-1] += (self.rP_breve[-1] - self.rP_breve_old[-1]) - self.dt / self.tauHP * self.rP_breve_HI[-1]
+		for i in range(len(self.rP_breve)):
+		      self.rP_breve_HI[i] += (self.rP_breve[i] - self.rP_breve_old[i]) - self.dt / self.tauHP * self.rP_breve_HI[i]
+		# self.rP_breve_HI[-1] += (self.rP_breve[-1] - self.rP_breve_old[-1]) - self.dt / self.tauHP * self.rP_breve_HI[-1]
 
 		return self.rP_breve_HI
 
@@ -888,17 +970,28 @@ class noise_model(base_model):
 			self.vbas[0] = self.WPP[0] @ self.r0
 
 		for i in range(1, len(self.layers)-1):
-			self.vbas[i] = self.calc_vbas(self.rP_breve[i-1], self.WPP[i])
+			self.vbas[i] = self.calc_vbas(self.rP_breve[i-1], self.WPP[i])		
 
-		# add slow response to dendritic compartment of interneurons
-		if self.inter_low_pass:
-			self.vden[0] += self.dt / self.tauLO * (self.calc_vden(self.rP_breve[-2], self.WIP[-1]) - self.vden[0])
-		else:
-			# else, instant response
-			self.vden[0] = self.calc_vden(self.rP_breve[-2], self.WIP[-1])
+		for i in range(len(self.WIP)):
+			if self.bw_connection_mode == 'skip':
+				# add slow response to dendritic compartment of interneurons
+				if self.inter_low_pass:
+					self.vden[0] += self.dt / self.tauLO * (self.calc_vden(self.rP_breve[-2], self.WIP[-1]) - self.vden[0])
+				else:
+					# else, instant response
+					self.vden[0] = self.calc_vden(self.rP_breve[-2], self.WIP[-1])
+			elif self.bw_connection_mode == 'layered':
+				if self.inter_low_pass:
+					self.vden[i] += self.dt / self.tauLO * (self.calc_vden(self.rP_breve[i], self.WIP[i]) - self.vden[i])
+				else:
+					self.vden[i] = self.calc_vden(self.rP_breve[i], self.WIP[i])
 
 		for i in range(0, len(self.layers)-2):
-			self.vapi[i] = self.calc_vapi(self.rP_breve[-1], self.BPP[i], self.rI_breve[-1], self.BPI[i])
+			if self.bw_connection_mode == 'skip':
+				self.vapi[i] = self.calc_vapi(self.rP_breve[-1], self.BPP[i], self.rI_breve[-1], self.BPI[i])
+			elif self.bw_connection_mode == 'layered':
+				self.vapi[i] = self.calc_vapi(self.rP_breve[i+1], self.BPP[i], self.rI_breve[i], self.BPI[i])
+
 			self.vapi_noise[i] = self.vapi[i] + self.noise[i]
 
 		return self.vbas, self.vapi, self.vapi_noise, self.vden
@@ -909,57 +1002,67 @@ class noise_model(base_model):
 		self.dBPP = [np.zeros(shape=BPP.shape) for BPP in self.BPP]
 
 		for i in range(len(self.BPP)):
+			if self.bw_connection_mode == 'skip':
+				if self.pyr_hi_pass:
+					r_pre = self.rP_breve_HI[-1]
+				else:
+					r_pre = self.rP_breve[-1]
+			elif self.bw_connection_mode == 'layered':
+				if self.pyr_hi_pass:
+					r_pre = self.rP_breve_HI[i+1]
+				else:
+					r_pre = self.rP_breve[i+1]
 
 			if self.model == "LDRL":
 				if self.pyr_hi_pass:
 					self.dBPP[i] = self.dt * self.eta_bw[i] * np.outer(
-						self.noise[i], self.rP_breve_HI[-1]
+						self.noise[i], r_pre
 						)
 					# add regularizer with gate or without
 					if self.gate_regularizer:
 						self.dBPP[i] -= self.dt * self.alpha[i] * \
-							self.eta_bw[i] * self.BPP[i] * d_relu(self.rP_breve_HI[-1])
+							self.eta_bw[i] * self.BPP[i] * d_relu(r_pre)
 					else:
 						self.dBPP[i] -= self.dt * self.alpha[i] * self.eta_bw[i] * self.BPP[i]
 
 				else:
 					self.dBPP[i] = self.dt * self.eta_bw[i] * np.outer(
-						self.noise[i], self.rP_breve[-1]
+						self.noise[i], r_pre
 						)
 					# add regularizer with gate or without
 					if self.gate_regularizer:
 						self.dBPP[i] -= self.dt * self.alpha[i] * \
-							self.eta_bw[i] * self.BPP[i] * d_relu(self.rP_breve[-1])
+							self.eta_bw[i] * self.BPP[i] * d_relu(r_pre)
 					else:
 						self.dBPP[i] -= self.dt * self.alpha[i] * self.eta_bw[i] * self.BPP[i]
 				
 
+			# THIS MODE NOT IMPLEMENTED CURRENTLY 
+			# elif self.model == "DTPDRL":
+			# 	if self.pyr_hi_pass:
+			# 		if np.linalg.norm(self.noise[i]) != 0.0:
+			# 			self.dBPP[i] = - self.dt * self.eta_bw[i] * np.outer(
+			# 				self.BPP[i] @ self.rP_breve_HI[-1] - self.noise[i],
+			# 				self.rP_breve_HI[-1]
+			# 				)
+			# 		# add regularizer with gate or without
+			# 		if self.gate_regularizer:
+			# 			self.dBPP[i] -= self.dt * self.alpha[i] * \
+			# 				self.eta_bw[i] * self.BPP[i] * d_relu(self.rP_breve_HI[-1])
+			# 		else:
+			# 			self.dBPP[i] -= self.dt * self.alpha[i] * self.eta_bw[i] * self.BPP[i]
 
-			elif self.model == "DTPDRL":
-				if self.pyr_hi_pass:
-					if np.linalg.norm(self.noise[i]) != 0.0:
-						self.dBPP[i] = - self.dt * self.eta_bw[i] * np.outer(
-							self.BPP[i] @ self.rP_breve_HI[-1] - self.noise[i],
-							self.rP_breve_HI[-1]
-							)
-					# add regularizer with gate or without
-					if self.gate_regularizer:
-						self.dBPP[i] -= self.dt * self.alpha[i] * \
-							self.eta_bw[i] * self.BPP[i] * d_relu(self.rP_breve_HI[-1])
-					else:
-						self.dBPP[i] -= self.dt * self.alpha[i] * self.eta_bw[i] * self.BPP[i]
-
-				else:
-					self.dBPP[i] = - self.dt * self.eta_bw[i] * np.outer(
-						self.BPP[i] @ self.rP_breve[-1] + self.BPI[i] @ self.rI_breve[-1] - self.noise[i],
-						self.rP_breve[-1]
-						)
-					# add regularizer with gate or without
-					if self.gate_regularizer:
-						self.dBPP[i] -= self.dt * self.alpha[i] * \
-							self.eta_bw[i] * self.BPP[i] * d_relu(self.rP_breve[-1])
-					else:
-						self.dBPP[i] -= self.dt * self.alpha[i] * self.eta_bw[i] * self.BPP[i]
+			# 	else:
+			# 		self.dBPP[i] = - self.dt * self.eta_bw[i] * np.outer(
+			# 			self.BPP[i] @ self.rP_breve[-1] + self.BPI[i] @ self.rI_breve[-1] - self.noise[i],
+			# 			self.rP_breve[-1]
+			# 			)
+			# 		# add regularizer with gate or without
+			# 		if self.gate_regularizer:
+			# 			self.dBPP[i] -= self.dt * self.alpha[i] * \
+			# 				self.eta_bw[i] * self.BPP[i] * d_relu(self.rP_breve[-1])
+			# 		else:
+			# 			self.dBPP[i] -= self.dt * self.alpha[i] * self.eta_bw[i] * self.BPP[i]
 
 
 		return self.dBPP
