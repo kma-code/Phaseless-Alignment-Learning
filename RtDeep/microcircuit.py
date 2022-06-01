@@ -70,13 +70,17 @@ def moving_average(x, w):
 class base_model:
 	""" This class implements a generic microcircuit model """
 
-	def __init__(self, bw_connection_mode, dt, Tpres, model, activation, layers,
+	def __init__(self, bw_connection_mode, dWPP_use_activation, dt, Tpres, model, activation, layers,
 					uP_init, uI_init, WPP_init, WIP_init, BPP_init, BPI_init,
 					gl, gden, gbas, gapi, gnI, gntgt,
-					eta_fw, eta_bw, eta_PI, eta_IP):
+					eta_fw, eta_bw, eta_PI, eta_IP, seed=123):
+
+		self.rng = np.random.RandomState(seed)
 
 		# connection_mode: skip or layered
 		self.bw_connection_mode = bw_connection_mode
+		# whether to use activation in updates of WPP
+		self.dWPP_use_activation = dWPP_use_activation
 
 		self.model = model # FA, BP or PBP
 		self.layers = layers
@@ -517,46 +521,92 @@ class base_model:
 		self.dBPP = [np.zeros(shape=BPP.shape) for BPP in self.BPP]
 		self.dBPI = [np.zeros(shape=BPI.shape) for BPI in self.BPI]
 
-		if self.dWPP_r_low_pass:
-			if r0 is not None:
-				self.r0_LO_old += self.dt / self.tauLO * (self.r0_old - self.r0_LO_old)
-				# print("updating WPP0")
-				self.dWPP[0] = self.dt * self.eta_fw[0] * np.outer(
-						self.rP_breve[0] - self.activation[0](self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[0]),
-														self.r0_LO_old)
+		if self.dWPP_use_activation:
 
-			for i in range(1, len(self.WPP)-1):
-				self.r_LO_old[i-1] += self.dt / self.tauLO * (self.rP_breve_old[i-1] - self.r_LO_old[i-1])
+			if self.dWPP_r_low_pass:
+				if r0 is not None:
+					self.r0_LO_old += self.dt / self.tauLO * (self.r0_old - self.r0_LO_old)
+					# print("updating WPP0")
+					self.dWPP[0] = self.dt * self.eta_fw[0] * np.outer(
+							self.rP_breve[0] - self.activation[0](self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[0]),
+															self.r0_LO_old)
+
+				for i in range(1, len(self.WPP)-1):
+					self.r_LO_old[i-1] += self.dt / self.tauLO * (self.rP_breve_old[i-1] - self.r_LO_old[i-1])
+					# hidden layers
+					# print(f"updating WPP{i}")
+					self.dWPP[i] = self.dt * self.eta_fw[i] * np.outer(
+							self.rP_breve[i] - self.activation[i](self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[i]),
+															self.r_LO_old[i-1])
+				# output layer
+				self.r_LO_old[-2] += self.dt / self.tauLO * (self.rP_breve_old[-2] - self.r_LO_old[-2])
+				# print("updating WPP-1")
+				self.dWPP[-1] = self.dt * self.eta_fw[-1] * np.outer(
+							self.rP_breve[-1] - self.activation[-1](self.gbas / (self.gl + self.gbas) * self.vbas_old[-1]),
+															self.r_LO_old[-2])
+
+			else:
+				# input layer
+				if r0 is not None:
+					# print("updating WPP0")
+					self.dWPP[0] = self.dt * self.eta_fw[0] * np.outer(
+							self.rP_breve[0] - self.activation[0](self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[0]),
+															self.r0_old)
 				# hidden layers
-				# print(f"updating WPP{i}")
-				self.dWPP[i] = self.dt * self.eta_fw[i] * np.outer(
-						self.rP_breve[i] - self.activation[i](self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[i]),
-														self.r_LO_old[i-1])
-			# output layer
-			self.r_LO_old[-2] += self.dt / self.tauLO * (self.rP_breve_old[-2] - self.r_LO_old[-2])
-			# print("updating WPP-1")
-			self.dWPP[-1] = self.dt * self.eta_fw[-1] * np.outer(
-						self.rP_breve[-1] - self.activation[-1](self.gbas / (self.gl + self.gbas) * self.vbas_old[-1]),
-														self.r_LO_old[-2])
+				for i in range(1, len(self.WPP)-1):
+					# print(f"updating WPP{i}")
+					self.dWPP[i] = self.dt * self.eta_fw[i] * np.outer(
+							self.rP_breve[i] - self.activation[i](self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[i]),
+															self.rP_breve_old[i-1])
+				# output layer
+				# print("updating WPP-1")
+				self.dWPP[-1] = self.dt * self.eta_fw[-1] * np.outer(
+							self.rP_breve[-1] - self.activation[-1](self.gbas / (self.gl + self.gbas) * self.vbas_old[-1]),
+															self.rP_breve_old[-2])
 
 		else:
-			# input layer
-			if r0 is not None:
-				# print("updating WPP0")
-				self.dWPP[0] = self.dt * self.eta_fw[0] * np.outer(
-						self.rP_breve[0] - self.activation[0](self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[0]),
-														self.r0_old)
-			# hidden layers
-			for i in range(1, len(self.WPP)-1):
-				# print(f"updating WPP{i}")
-				self.dWPP[i] = self.dt * self.eta_fw[i] * np.outer(
-						self.rP_breve[i] - self.activation[i](self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[i]),
-														self.rP_breve_old[i-1])
-			# output layer
-			# print("updating WPP-1")
-			self.dWPP[-1] = self.dt * self.eta_fw[-1] * np.outer(
-						self.rP_breve[-1] - self.activation[-1](self.gbas / (self.gl + self.gbas) * self.vbas_old[-1]),
-														self.rP_breve_old[-2])
+
+			if self.dWPP_r_low_pass:
+				if r0 is not None:
+					self.r0_LO_old += self.dt / self.tauLO * (self.r0_old - self.r0_LO_old)
+					# print("updating WPP0")
+					self.dWPP[0] = self.dt * self.eta_fw[0] * np.outer(
+							self.uP_breve[0] - (self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[0]),
+															self.r0_LO_old)
+
+				for i in range(1, len(self.WPP)-1):
+					self.r_LO_old[i-1] += self.dt / self.tauLO * (self.rP_breve_old[i-1] - self.r_LO_old[i-1])
+					# hidden layers
+					# print(f"updating WPP{i}")
+					self.dWPP[i] = self.dt * self.eta_fw[i] * np.outer(
+							self.uP_breve[i] - (self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[i]),
+															self.r_LO_old[i-1])
+				# output layer
+				self.r_LO_old[-2] += self.dt / self.tauLO * (self.rP_breve_old[-2] - self.r_LO_old[-2])
+				# print("updating WPP-1")
+				self.dWPP[-1] = self.dt * self.eta_fw[-1] * np.outer(
+							self.uP_breve[-1] - (self.gbas / (self.gl + self.gbas) * self.vbas_old[-1]),
+															self.r_LO_old[-2])
+
+			else:
+				# input layer
+				if r0 is not None:
+					# print("updating WPP0")
+					self.dWPP[0] = self.dt * self.eta_fw[0] * np.outer(
+							self.uP_breve[0] - (self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[0]),
+															self.r0_old)
+				# hidden layers
+				for i in range(1, len(self.WPP)-1):
+					# print(f"updating WPP{i}")
+					self.dWPP[i] = self.dt * self.eta_fw[i] * np.outer(
+							self.uP_breve[i] - (self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[i]),
+															self.rP_breve_old[i-1])
+				# output layer
+				# print("updating WPP-1")
+				self.dWPP[-1] = self.dt * self.eta_fw[-1] * np.outer(
+							self.uP_breve[-1] - (self.gbas / (self.gl + self.gbas) * self.vbas_old[-1]),
+															self.rP_breve_old[-2])
+
 
 		"""
 			plasticity of WIP
@@ -599,6 +649,7 @@ class base_model:
 
 		elif self.model == 'BP':
 			self.set_weights(BPP = [WPP.T for WPP in self.WPP[1:]])
+			self.set_weights(BPI = [-BPP for BPP in self.BPP])
 
 
 		return self.dWPP, self.dWIP, self.dBPP, self.dBPI 
@@ -608,22 +659,22 @@ class base_model:
 
 class noise_model(base_model):
 	""" This class inherits all properties from the base model class and adds the function to add noise """
-	def __init__(self, bw_connection_mode, dt, dtxi, tauHP, tauLO, Tpres, noise_scale, alpha, inter_low_pass, pyr_hi_pass, dWPP_low_pass, dWPP_r_low_pass, gate_regularizer,
+	def __init__(self, bw_connection_mode, dWPP_use_activation, dt, dtxi, tauHP, tauLO, Tpres, noise_scale, alpha, inter_low_pass, pyr_hi_pass, dWPP_low_pass, dWPP_r_low_pass, gate_regularizer,
 					noise_type, noise_mode,
 					model, activation, layers,
 					uP_init, uI_init, WPP_init, WIP_init, BPP_init, BPI_init,
 					gl, gden, gbas, gapi, gnI, gntgt,
-					eta_fw, eta_bw, eta_PI, eta_IP, **kwargs):
+					eta_fw, eta_bw, eta_PI, eta_IP, seed=123, **kwargs):
 
 		# init base_model with same settings
-		super().__init__(bw_connection_mode=bw_connection_mode, dt=dt, Tpres=Tpres,
+		super().__init__(bw_connection_mode=bw_connection_mode, dWPP_use_activation=dWPP_use_activation, dt=dt, Tpres=Tpres,
 			model=model, activation=activation, layers=layers,
             uP_init=uP_init, uI_init=uI_init,
             WPP_init=WPP_init, WIP_init=WIP_init, BPP_init=BPP_init, BPI_init=BPI_init,
             gl=gl, gden=gden, gbas=gbas, gapi=gapi, gnI=gnI, gntgt=gntgt,
-            eta_fw=eta_fw, eta_bw=eta_bw, eta_PI=eta_PI, eta_IP=eta_IP)
+            eta_fw=eta_fw, eta_bw=eta_bw, eta_PI=eta_PI, eta_IP=eta_IP, seed=seed)
 
-		# new variables:
+		self.rng = np.random.RandomState(seed)
 
 		# type of noise (OU or white)
 		self.noise_type = noise_type
@@ -858,19 +909,19 @@ class noise_model(base_model):
 
 			elif self.noise_mode == 'const':
 				# add noise with magnitude of rescaled uP
-				white_noise = noise_scale[layer] * np.random.normal(0, 1, size=self.uP[layer].shape)
+				white_noise = noise_scale[layer] * self.rng.normal(0, 1, size=self.uP[layer].shape)
 
 			elif self.noise_mode == 'uP':
 				# add noise with magnitude of rescaled uP
-				white_noise = noise_scale[layer] * np.array([np.random.normal(0, np.abs(x)) for x in self.uP[layer]])
+				white_noise = noise_scale[layer] * np.array([self.rng.normal(0, np.abs(x)) for x in self.uP[layer]])
 
 			elif self.noise_mode == 'uP_breve':
 				# add noise with magnitude of rescaled uP_breve
-				white_noise = noise_scale[layer] * np.array([np.random.normal(0, np.abs(x)) for x in self.uP_breve[layer]])
+				white_noise = noise_scale[layer] * np.array([self.rng.normal(0, np.abs(x)) for x in self.uP_breve[layer]])
 
 			elif self.noise_mode == 'vapi':
 				# add noise with magnitude of rescaled vapi
-				white_noise = noise_scale[layer] * np.array([np.random.normal(0, np.abs(x)) for x in self.vapi[layer]])
+				white_noise = noise_scale[layer] * np.array([self.rng.normal(0, np.abs(x)) for x in self.vapi[layer]])
 
 			# the noise will be added to vapi, depending on the mode
 			if self.noise_type == 'hold_white_noise':
