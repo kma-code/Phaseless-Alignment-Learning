@@ -135,9 +135,15 @@ def main(params, task='fw_bw', seeds=[667], load=None, compare_model=None):
 		# if task == 'fw_bw':
 			# generate comparison with BP weight updates
 			# MC_list = compare.compare_updates(MC_list=MC_list, model=compare_model)
+		# else:
+		# 	MC_list = compare.compare_updates_bw_only(MC_list=MC_list, model=compare_model)
 		
+		# create angle between WPP.T and BPP
+		MC_list = compare.compare_weight_matrices(MC_list=MC_list, model=compare_model)
 		# create angle between Jacobians
 		MC_list = compare.compare_jacobians(MC_list=MC_list, model=compare_model)
+		# create angle between BPP and phi' WPP.T phi'
+		MC_list = compare.compare_BPP_RHS(MC_list=MC_list, model=compare_model)
 
 
 	logging.info(f'Plotting results')

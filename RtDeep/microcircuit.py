@@ -149,8 +149,9 @@ class base_model:
 		self.r0 = np.zeros(self.layers[0])
 
 		self.dWPP_r_low_pass = False
+		self.dWPP_post_low_pass = False
 
-	def init_record(self, rec_per_steps=1, rec_MSE=False, rec_error=False,
+	def init_record(self, rec_per_steps=1, rec_MSE=False, rec_error=False, rec_input=False,
 		rec_WPP=False, rec_WIP=False, rec_BPP=False, rec_BPI=False,
 		rec_dWPP=False, rec_dWIP=False, rec_dBPP=False, rec_dBPI=False,
 		rec_uP=False, rec_uP_breve=False, rec_rP_breve=False, rec_rP_breve_HI=False, rec_uI=False, rec_uI_breve=False, rec_rI_breve=False,
@@ -164,6 +165,8 @@ class base_model:
 			self.MSE_time_series = []
 		if rec_error:
 			self.error_time_series = []
+		if rec_input:
+			self.input_time_series = []
 		if rec_WPP:
 			self.WPP_time_series = []
 		if rec_WIP:
@@ -220,6 +223,8 @@ class base_model:
 			self.error_time_series.append(
 				self.uP_breve[-1] - target
 				)
+		if hasattr(self, 'input_time_series'):
+			self.input_time_series.append(copy.deepcopy(self.r0))
 		if hasattr(self, 'WPP_time_series'):
 			self.WPP_time_series.append(copy.deepcopy(self.WPP))
 		if hasattr(self, 'WIP_time_series'):
@@ -545,6 +550,29 @@ class base_model:
 							self.rP_breve[-1] - self.activation[-1](self.gbas / (self.gl + self.gbas) * self.vbas_old[-1]),
 															self.r_LO_old[-2])
 
+			elif self.dWPP_post_low_pass:
+				if r0 is not None:
+					self.dWPP_post_LO_old[0] += self.dt / self.tauLO * \
+						(self.rP_breve[0] - self.activation[0](self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[0]) \
+							- self.dWPP_post_LO_old[0])
+					# print("updating WPP0")
+					self.dWPP[0] = self.dt * self.eta_fw[0] * np.outer(self.dWPP_post_LO_old[0], self.r0_old)
+
+				for i in range(1, len(self.WPP)-1):
+					self.dWPP_post_LO_old[i] += self.dt / self.tauLO * \
+						(self.rP_breve[i] - self.activation[i](self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[i]) \
+							- self.dWPP_post_LO_old[i])
+					# hidden layers
+					# print(f"updating WPP{i}")
+					self.dWPP[i] = self.dt * self.eta_fw[i] * np.outer(self.dWPP_post_LO_old[i], self.rP_breve_old[i-1])
+
+				# output layer
+				self.dWPP_post_LO_old[-1] += self.dt / self.tauLO * \
+						(self.rP_breve[-1] - self.activation[-1](self.gbas / (self.gl + self.gbas) * self.vbas_old[-1]) \
+							- self.dWPP_post_LO_old[-1])
+				# print("updating WPP-1")
+				self.dWPP[-1] = self.dt * self.eta_fw[-1] * np.outer(self.dWPP_post_LO_old[-1], self.rP_breve_old[-2])
+
 			else:
 				# input layer
 				if r0 is not None:
@@ -587,6 +615,30 @@ class base_model:
 				self.dWPP[-1] = self.dt * self.eta_fw[-1] * np.outer(
 							self.uP_breve[-1] - (self.gbas / (self.gl + self.gbas) * self.vbas_old[-1]),
 															self.r_LO_old[-2])
+
+			elif self.dWPP_post_low_pass:
+				if r0 is not None:
+					self.dWPP_post_LO_old[0] += self.dt / self.tauLO * \
+						(self.uP_breve[0] - (self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[0]) \
+							- self.dWPP_post_LO_old[0])
+					# print("updating WPP0")
+					self.dWPP[0] = self.dt * self.eta_fw[0] * np.outer(self.dWPP_post_LO_old[0], self.r0_old)
+
+				for i in range(1, len(self.WPP)-1):
+					self.dWPP_post_LO_old[i] += self.dt / self.tauLO * \
+						(self.uP_breve[i] - (self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[i]) \
+							- self.dWPP_post_LO_old[i])
+					# hidden layers
+					# print(f"updating WPP{i}")
+					self.dWPP[i] = self.dt * self.eta_fw[i] * np.outer(self.dWPP_post_LO_old[i], self.r_old[i-1])
+
+				# output layer
+				self.dWPP_post_LO_old[-1] += self.dt / self.tauLO * \
+						(self.uP_breve[-1] - (self.gbas / (self.gl + self.gbas + self.gapi) * self.vbas_old[-1]) \
+							- self.dWPP_post_LO_old[-1])
+				# print("updating WPP-1")
+				self.dWPP[-1] = self.dt * self.eta_fw[-1] * np.outer(self.dWPP_post_LO_old[-1], self.r_old[-2])
+
 
 			else:
 				# input layer
@@ -659,7 +711,8 @@ class base_model:
 
 class noise_model(base_model):
 	""" This class inherits all properties from the base model class and adds the function to add noise """
-	def __init__(self, bw_connection_mode, dWPP_use_activation, dt, dtxi, tauHP, tauLO, Tpres, noise_scale, alpha, inter_low_pass, pyr_hi_pass, dWPP_low_pass, dWPP_r_low_pass, gate_regularizer,
+	def __init__(self, bw_connection_mode, dWPP_use_activation, dt, dtxi, tauHP, tauLO, Tpres, noise_scale, alpha,
+				    inter_low_pass, pyr_hi_pass, dWPP_low_pass, dWPP_r_low_pass, dWPP_post_low_pass, gate_regularizer,
 					noise_type, noise_mode,
 					model, activation, layers,
 					uP_init, uI_init, WPP_init, WIP_init, BPP_init, BPI_init,
@@ -697,6 +750,7 @@ class noise_model(base_model):
 		# whether to low-pass filter updates of WPP
 		self.dWPP_low_pass = dWPP_low_pass
 		self.dWPP_r_low_pass = dWPP_r_low_pass
+		self.dWPP_post_low_pass = dWPP_post_low_pass
 		# whether to gate application of the regularizer
 		self.gate_regularizer = gate_regularizer
 		# noise time scale
@@ -724,6 +778,7 @@ class noise_model(base_model):
 
 		# init a low-pass filtered version of dWPP
 		self.dWPP_LO = [np.zeros(shape=WPP.shape) for WPP in self.WPP]
+		self.dWPP_post_LO_old = [np.zeros(shape=rP_breve.shape) for rP_breve in self.rP_breve]
 		self.r0_LO_old = np.zeros(shape=layers[0])
 		self.r_LO_old = [np.zeros(shape=rP_breve.shape) for rP_breve in self.rP_breve]
 

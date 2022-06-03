@@ -150,6 +150,7 @@ def init_MC(params, seeds, teacher=False):
 					pyr_hi_pass=params["pyr_hi_pass"],
 					dWPP_low_pass=params["dWPP_low_pass"],
 					dWPP_r_low_pass=params["dWPP_r_low_pass"],
+					dWPP_post_low_pass=params["dWPP_post_low_pass"],
 					gate_regularizer=params["gate_regularizer"],
 
 					noise_type=params["noise_type"],
@@ -202,6 +203,7 @@ def init_MC(params, seeds, teacher=False):
 		else:
 			MC_list[-1].rec_MSE=params["rec_MSE"]
 			MC_list[-1].rec_error=params["rec_error"]
+		MC_list[-1].rec_input=params["rec_input"]
 		MC_list[-1].rec_WPP=params["rec_WPP"]
 		MC_list[-1].rec_WIP=params["rec_WIP"]
 		MC_list[-1].rec_BPP=params["rec_BPP"] 

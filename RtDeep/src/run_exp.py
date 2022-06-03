@@ -16,6 +16,7 @@ def run(mc, learn=True, teacher=False):
 	mc.init_record(rec_per_steps=mc.rec_per_steps,
 		rec_MSE=mc.rec_MSE,
 		rec_error=mc.rec_error,
+		rec_input=mc.rec_input,
 		rec_WPP=mc.rec_WPP,
 		rec_WIP=mc.rec_WIP,
 		rec_BPP=mc.rec_BPP,
