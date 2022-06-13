@@ -313,8 +313,9 @@ class base_model:
 		for i in range(len(self.BPP)):
 				self.BPI[i] = - self.BPP[i].copy()
 
-		for i in range(len(self.WIP)):
-			self.WIP[i] = self.gbas * (self.gl + self.gden) / (self.gden * (self.gl + self.gbas)) * self.WPP[i+1].copy()
+		for i in range(len(self.WIP)-1):
+			self.WIP[i] = self.gbas * (self.gl + self.gden) / (self.gden * (self.gl + self.gbas + self.gapi)) * self.WPP[i+1].copy()
+		self.WIP[-1] = self.gbas * (self.gl + self.gden) / (self.gden * (self.gl + self.gbas)) * self.WPP[-1].copy()
 
 	def get_voltages(self):
 		return self.uP, self.uI

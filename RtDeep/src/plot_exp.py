@@ -117,7 +117,7 @@ def plot(MC_list, MC_teacher=None, path=None):
 						plt.plot(vec1+vec2, c=c)
 						# if MC_teacher is not None:
 						# 	plt.plot(np.array([MC_teacher[0].BPI[i][j] for vec in MC_list[0].BPI_time_series[TPRE:]]), c=CLR_TEACH, ls='--')
-				plt.title("$B^\\mathrm{PI}$ layer " + str(i+1))
+				plt.title("$B^\\mathrm{PI}+B^\\mathrm{PP}$ layer " + str(i+1))
 				# plt.grid()
 				# plt.ylim(0,1)
 				plt.xlabel(str(MC_list[0].rec_per_steps) + ' dt')
