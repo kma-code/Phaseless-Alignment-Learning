@@ -69,6 +69,16 @@ def training(mc, r0_arr, epochs=1, learn=True, teacher=False):
 
 	for n in range(epochs):
 		logging.info(f"Seed {mc.seed}: working on epoch {n}")
+
+		if mc.input_signal == 'step':
+			logging.debug(f"Shuffling input")
+			# # extract unique samples, i.e. first sample after Tpres
+			r0_arr = r0_arr[::int(mc.Tpres / mc.dt)]
+			# # shuffle along time axis
+			mc.rng.shuffle(r0_arr)
+			# # repeat samples for Tpres times
+			r0_arr = np.repeat(r0_arr, int(mc.Tpres / mc.dt), axis=0)
+
 		for i in range(len(r0_arr)):
 			# if mc is teacher, evolve and record
 			if teacher:
