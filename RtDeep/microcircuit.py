@@ -151,7 +151,7 @@ class base_model:
 		self.dWPP_r_low_pass = False
 		self.dWPP_post_low_pass = False
 
-	def init_record(self, rec_per_steps=1, rec_MSE=False, rec_error=False, rec_input=False,
+	def init_record(self, rec_per_steps=1, rec_MSE=False, rec_error=False, rec_input=False, rec_target=False,
 		rec_WPP=False, rec_WIP=False, rec_BPP=False, rec_BPI=False,
 		rec_dWPP=False, rec_dWIP=False, rec_dBPP=False, rec_dBPI=False,
 		rec_uP=False, rec_uP_breve=False, rec_rP_breve=False, rec_rP_breve_HI=False, rec_uI=False, rec_uI_breve=False, rec_rI_breve=False,
@@ -167,6 +167,8 @@ class base_model:
 			self.error_time_series = []
 		if rec_input:
 			self.input_time_series = []
+		if rec_target:
+			self.target_time_series = []
 		if rec_WPP:
 			self.WPP_time_series = []
 		if rec_WIP:
@@ -225,6 +227,8 @@ class base_model:
 				)
 		if hasattr(self, 'input_time_series'):
 			self.input_time_series.append(copy.deepcopy(self.r0))
+		if hasattr(self, 'target_time_series') and target is not None:
+			self.target_time_series.append(target.copy())
 		if hasattr(self, 'WPP_time_series'):
 			self.WPP_time_series.append(copy.deepcopy(self.WPP))
 		if hasattr(self, 'WIP_time_series'):

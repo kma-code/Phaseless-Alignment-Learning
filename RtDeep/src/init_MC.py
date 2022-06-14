@@ -205,6 +205,7 @@ def init_MC(params, seeds, teacher=False):
 			MC_list[-1].rec_MSE=params["rec_MSE"]
 			MC_list[-1].rec_error=params["rec_error"]
 		MC_list[-1].rec_input=params["rec_input"]
+		MC_list[-1].rec_target=params["rec_target"]
 		MC_list[-1].rec_WPP=params["rec_WPP"]
 		MC_list[-1].rec_WIP=params["rec_WIP"]
 		MC_list[-1].rec_BPP=params["rec_BPP"] 

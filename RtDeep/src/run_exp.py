@@ -17,6 +17,7 @@ def run(mc, learn=True, teacher=False):
 		rec_MSE=mc.rec_MSE,
 		rec_error=mc.rec_error,
 		rec_input=mc.rec_input,
+		rec_target=mc.rec_target,
 		rec_WPP=mc.rec_WPP,
 		rec_WIP=mc.rec_WIP,
 		rec_BPP=mc.rec_BPP,
@@ -71,13 +72,34 @@ def training(mc, r0_arr, epochs=1, learn=True, teacher=False):
 		logging.info(f"Seed {mc.seed}: working on epoch {n}")
 
 		if mc.input_signal == 'step':
-			logging.debug(f"Shuffling input")
-			# # extract unique samples, i.e. first sample after Tpres
-			r0_arr = r0_arr[::int(mc.Tpres / mc.dt)]
-			# # shuffle along time axis
-			mc.rng.shuffle(r0_arr)
-			# # repeat samples for Tpres times
-			r0_arr = np.repeat(r0_arr, int(mc.Tpres / mc.dt), axis=0)
+
+			if not teacher and hasattr(mc, 'target'):
+				logging.debug(f"Shuffling input and output pairs")
+				# # extract unique samples, i.e. first sample after Tpres
+				r0_arr = r0_arr[::int(mc.Tpres / mc.dt)]
+				target = np.array(mc.target)[int(mc.Tpres / mc.dt)-1:][::int(mc.Tpres / mc.dt)]
+				# combine with target voltages
+				# new array has axes [time, neuron id, r0/target]
+				input_output_arr = np.transpose(np.array([r0_arr, target]), (1,2,0))
+				# # shuffle along time axis
+				mc.rng.shuffle(input_output_arr)
+				# # repeat samples for Tpres times
+				input_output_arr = np.repeat(input_output_arr, int(mc.Tpres / mc.dt), axis=0)
+				# extract input, ouput
+				r0_arr, target = np.transpose(input_output_arr, (2, 0, 1))
+
+				mc.target = target.copy()
+
+			elif not teacher:
+				logging.debug(f"Shuffling input")
+				# # extract unique samples, i.e. first sample after Tpres
+				r0_arr = r0_arr[::int(mc.Tpres / mc.dt)]
+				# # shuffle along time axis
+				mc.rng.shuffle(r0_arr)
+				# # repeat samples for Tpres times
+				r0_arr = np.repeat(r0_arr, int(mc.Tpres / mc.dt), axis=0)
+			
+			
 
 		for i in range(len(r0_arr)):
 			# if mc is teacher, evolve and record
