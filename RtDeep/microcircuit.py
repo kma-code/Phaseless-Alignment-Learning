@@ -809,9 +809,6 @@ class noise_model(base_model):
 		# see calc_dendritic updates below
 		self.duP, self.duI = self.evolve_voltages(r0, u_tgt, inject_noise=learn_bw_weights) # includes recalc of rP_breve
 
-		# calculate hi-passed rP_breve for synapse BPP
-		self.rP_breve_HI = self.calc_rP_breve_HI()
-
 		if learn_weights:
 			self.dWPP, self.dWIP, _, self.dBPI = self.evolve_synapses(r0)
 		if learn_bw_weights:
@@ -849,6 +846,9 @@ class noise_model(base_model):
 
 		# increase timer
 		self.Time = np.round(self.Time + self.dt, decimals=self.dt_decimals)
+
+		# calculate hi-passed rP_breve for synapse BPP
+		self.rP_breve_HI = self.calc_rP_breve_HI()
 
 
 	def evolve_voltages(self, r0=None, u_tgt=None, inject_noise=False):
