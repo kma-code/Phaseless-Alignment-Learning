@@ -19,6 +19,7 @@ import argparse
 import logging
 import json
 import multiprocess as mp
+import functools
 import time
 
 N_MAX_PROCESSES = 12 # defined by compute setup
@@ -90,7 +91,7 @@ def main(params, task='fw_bw', seeds=[667], load=None, compare_model=None):
 		if task == 'fw_bw':
 			logging.info(f'Running teacher to obtain target signal')
 
-			MC_teacher = [run_exp.run(MC_teacher[0], learn=False, teacher=True)]
+			MC_teacher = [run_exp.run(MC_teacher[0], learn_weights=False, learn_lat_weights=False, learn_bw_weights=False, teacher=True)]
 
 			logging.info(f'Setting uP_breve in output layer of teacher as target')
 
@@ -108,8 +109,13 @@ def main(params, task='fw_bw', seeds=[667], load=None, compare_model=None):
 
 		logging.info(f'Setting up and running {N_PROCESSES} processes')
 
+		# init a partial function to pass additional arguments
+		if task == 'bw_only':
+			partial_run = functools.partial(run_exp.run, learn_weights=False, learn_lat_weights=True, learn_bw_weights=True, teacher=False)
+		elif task == 'fw_bw':
+			partial_run = functools.partial(run_exp.run, learn_weights=True, learn_lat_weights=True, learn_bw_weights=True, teacher=False)
 		with mp.Pool(N_PROCESSES) as pool:
-			MC_list = pool.map(run_exp.run, MC_list)
+			MC_list = pool.map(partial_run, MC_list)
 			pool.close()
 
 		t_diff = time.time() - t_start
