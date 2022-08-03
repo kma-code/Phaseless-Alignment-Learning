@@ -398,8 +398,7 @@ class base_model:
 		self.Time = np.round(self.Time + self.dt, decimals=np.int(np.round(-np.log10(self.dt))))
 
 		self.duP, self.duI = self.evolve_voltages(r0, u_tgt) # includes recalc of rP_breve
-		if learn_weights:
-			self.dWPP, self.dWIP, self.dBPP, self.dBPI = self.evolve_synapses(r0)
+		self.dWPP, self.dWIP, self.dBPP, self.dBPI = self.evolve_synapses(r0)
 
 		# apply evolution
 		for i in range(len(self.duP)):
@@ -811,10 +810,8 @@ class noise_model(base_model):
 		# see calc_dendritic updates below
 		self.duP, self.duI = self.evolve_voltages(r0, u_tgt, inject_noise=learn_bw_weights) # includes recalc of rP_breve
 
-		if learn_weights:
-			self.dWPP, self.dWIP, _, self.dBPI = self.evolve_synapses(r0)
-		if learn_bw_weights:
-			self.dBPP = self.evolve_bw_synapses()
+		self.dWPP, self.dWIP, _, self.dBPI = self.evolve_synapses(r0)
+		self.dBPP = self.evolve_bw_synapses()
 
 		# apply evolution
 		for i in range(len(self.duP)):

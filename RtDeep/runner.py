@@ -138,11 +138,15 @@ def main(params, task='fw_bw', seeds=[667], load=None, compare_model=None):
 	if compare_model is not None:
 		logging.info(f'Generating comparison to {compare_model}')
 
-		# if task == 'fw_bw':
+		N_PROCESSES = len(MC_list) if N_MAX_PROCESSES > len(MC_list) else N_MAX_PROCESSES
+
+		if task == 'bw_only':
 			# generate comparison with BP weight updates
-			# MC_list = compare.compare_updates(MC_list=MC_list, model=compare_model)
-		# else:
-		# 	MC_list = compare.compare_updates_bw_only(MC_list=MC_list, model=compare_model)
+			partial_run = functools.partial(compare.compare_updates, model=compare_model, params=params)
+			with mp.Pool(N_PROCESSES) as pool:
+				MC_list = pool.map(partial_run, MC_list)
+				pool.close()
+			# MC_list = compare.compare_updates(MC_list=MC_list, model=compare_model, params=params)
 		
 		# create angle between WPP.T and BPP
 		MC_list = compare.compare_weight_matrices(MC_list=MC_list, model=compare_model)

@@ -1,5 +1,8 @@
 import numpy as np
 from microcircuit import *
+import src.init_MC as init_MC
+import src.init_signals as init_signals
+import src.run_exp as run_exp
 import logging
 
 logging.basicConfig(format='Train model -- %(levelname)s: %(message)s',
@@ -16,53 +19,112 @@ derivative_mappings = {
 }
 
 
-def compare_updates(MC_list, model):
+def calc_dWPP_ANN(mc, W_list, activation_list, d_activation_list, r0, target):
+	'''
+
+		Calculates the weight updates in an ANN using BP
+		for given input and weights.
+
+		Input:  mc: microcircuit (needed for parameters)
+				W_list: list of weights for ANN
+				r0: input vector
+				target: target vector
+		Returns: list of updates dWPP in ANN
+
+	'''
+
+	# forward pass
+	# voltages correspond to vbashat
+	voltages = [np.zeros_like(vec) for vec in mc.uP_breve]
+	rates = [np.zeros_like(vec) for vec in mc.rP_breve]
+	voltages[0] = W_list[0] @ r0
+
+	for i in range(len(W_list)-1):
+		rates[i] = activation_list[i](voltages[i])
+		voltages[i+1] = mc.gbas / (mc.gbas + mc.gapi + mc.gl) * W_list[i+1] @ rates[i]
+	# correct output layer voltage
+	voltages[-1] = (mc.gbas + mc.gapi + mc.gl) / (mc.gbas + mc.gl) * voltages[-1]
+	rates[-1] = activation_list[-1](voltages[-1])
+
+	# backward pass:
+	dWPP_BP_list = [np.zeros_like(W) for W in W_list]
+
+	# calculate output error
+	error = np.diag(d_activation_list[-1](voltages[-1])) @ (target - rates[-1])
+	# propagate error backwards
+	for i in range(len(dWPP_BP_list)-1, 0, -1):
+		dWPP_BP_list[i] = np.outer(error, rates[i-1])
+		error = np.diag(d_activation_list[i-1](voltages[i-1])) @ W_list[i].T @ error
+	dWPP_BP_list[0] = np.outer(error, r0)
+
+	return dWPP_BP_list
+
+
+
+
+def compare_updates(mc, model, params):
+	"""
+		Compares updates of MC_list (list of trained microcircuit models)
+		given input/output pairs with an ANN with same weights
+
+	"""
+
 	# compare updates of mc object to dWPP of BP
 
 	# define the number of recorded time steps which belong to the pre-training
 	# and therefore should be skipped
-	TPRE = int(MC_list[0].settling_time / MC_list[0].dt / MC_list[0].rec_per_steps)
+	TPRE = int(mc.settling_time / mc.dt / mc.rec_per_steps)
 
 	if model == "BP":
 
-		for mc in MC_list:
-			d_activation_list = [derivative_mappings[activation] for activation in mc.activation]
-			r0 = np.tile(mc.input, mc.epochs)
+		# generate an input/target sequence
+		MC_teacher = init_MC.init_MC(params, params['random_seed'], teacher=True)
+		MC_teacher[0].set_self_predicting_state()
 
-			mc.angle_dWPP_time_series = []
+		logging.info(f'Teacher initialised with seed {MC_teacher[0].seed}')
+		MC_teacher = init_signals.init_r0(MC_list=MC_teacher, form=params["input_signal"], seed=MC_teacher[0].seed)
+		
+		logging.info(f'Running teacher to obtain target signal')
+		MC_teacher = [run_exp.run(MC_teacher[0], learn_weights=False, learn_lat_weights=False, learn_bw_weights=False, teacher=True)]
 
-			# for every time step
-			for i in range(len(mc.dWPP_time_series[TPRE:])):
-				angle_dWPP_arr = []
+		logging.info(f'Assigning input/target pairs of teacher to students')
+		mc = init_signals.init_r0(MC_list=[mc], form=params["input_signal"], seed=MC_teacher[0].seed)[0]
+		# for mc in MC_list:
+		# use uP_breve time series after settling time
+		mc.target = MC_teacher[0].target
 
-				# for every layer
-				for j in range(len(mc.layers)-1):
-					# print("j", j)
-					if j == 0:
-						r_in = r0
-					else:
-						r_in = mc.rP_breve_time_series[TPRE:][i][j-1]
+		# record dWPP for given sequence
+		# for mc in MC_list:
+		d_activation_list = [derivative_mappings[activation] for activation in mc.activation]
 
-					# construct weight update for BP net
+		logging.info(f'Evaluating dWPP for microcircuit {mc}')
+		mc.dWPP_time_series_compare = [] 	# dWPP for this mc
+		mc.dWPP_time_series_ANN = []		# dWPP for ANN with fowrward weights of this mc
+		mc.angle_updates_time_series = []	# angle between the entries of the above two lists
 
-					# for output layer
-					# print(j, len(r_int), len(mc.rP_breve_time_series))
-					# print(len(mc.dWPP_time_series[TPRE:]), len(mc.error_time_series))
-					dWPP_BP = np.outer(mc.error_time_series[i], r_in)
+		WPP_num = len(mc.WPP_time_series[TPRE:])	# length of WPP time series for progess counter
 
-					# multiply phi' @ W.T from left
-					for k in range(len(mc.layers)-2, j, -1):
-						# print(j, k)
-						dWPP_BP = np.diag(d_activation_list[k-1](mc.uP_breve_time_series[TPRE:][i][k-1])) @ mc.WPP_time_series[TPRE:][i][k].T @ dWPP_BP
+		for time, (WPP, WIP, BPP, BPI) in enumerate(zip(mc.WPP_time_series[TPRE:], mc.WIP_time_series[TPRE:], mc.BPP_time_series[TPRE:], mc.BPI_time_series[TPRE:])):
+			logging.info(f"Evaluating next set of weights {time}/{WPP_num}")
+			# set network to weights at this time step
+			mc.set_weights(WPP=WPP, WIP=WIP, BPP=BPP, BPI=BPI)
 
-					cos = cos_sim(mc.dWPP_time_series[TPRE:][i][j], -dWPP_BP)
+			# run with input, output pairs and record dWPP
+			for i, (r0, target) in enumerate(zip(mc.input, mc.target)):
+				mc.evolve_system(r0=r0, u_tgt=target, learn_weights=False, learn_lat_weights=False, learn_bw_weights=False)
+				# record dWPP after every presentation time
+				if (i+1) % (mc.Tpres / mc.dt) == 0:
+					# get weights in MC and ANN
+					mc.dWPP_time_series_compare.append(mc.dWPP)
+					mc.dWPP_time_series_ANN.append(calc_dWPP_ANN(mc=mc, W_list=mc.WPP, activation_list=mc.activation, d_activation_list=d_activation_list, r0=r0, target=target))
 
-					angle_dWPP_arr.append(deg(cos))
-					# print(angle_dWPP_arr[-1])
+					# calculate angle between weights
+					mc.angle_updates_time_series.append([
+						deg(cos_sim(mc_dWPP, BP_dWPP)) for mc_dWPP, BP_dWPP in zip(mc.dWPP_time_series_compare[-1], mc.dWPP_time_series_ANN[-1])
+						])
 
-				mc.angle_dWPP_time_series.append(angle_dWPP_arr)
-
-		return MC_list
+		len(mc.angle_updates_time_series)
+		return mc
 
 
 def compare_updates_bw_only(MC_list, model):
