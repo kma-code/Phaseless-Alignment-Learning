@@ -387,7 +387,7 @@ class base_model:
 		return uvec_old + tau * (uvec - uvec_old) / dt
 
 
-	def evolve_system(self, r0=None, u_tgt=None, learn_weights=True, learn_lat_weights=True, learn_bw_weights=False):
+	def evolve_system(self, r0=None, u_tgt=None, learn_weights=True, learn_lat_weights=True, learn_bw_weights=False, record=True):
 
 		""" evolves the system by one time step:
 			updates synaptic weights and voltages
@@ -419,7 +419,7 @@ class base_model:
 				self.BPP[i] += self.dBPP[i]
 
 		# record step
-		if hasattr(self, 'rec_per_steps'):
+		if hasattr(self, 'rec_per_steps') and record:
 			self.rec_counter += 1
 			if self.rec_counter % self.rec_per_steps == 0:
 				self.rec_counter = 0
@@ -792,7 +792,7 @@ class noise_model(base_model):
 		self.alpha = alpha
 
 
-	def evolve_system(self, r0=None, u_tgt=None, learn_weights=True, learn_lat_weights=True, learn_bw_weights=True):
+	def evolve_system(self, r0=None, u_tgt=None, learn_weights=True, learn_lat_weights=True, learn_bw_weights=True, record=True):
 
 		""" 
 			This overwrites the vanilla system evolution and implements
@@ -838,7 +838,7 @@ class noise_model(base_model):
 				self.BPP[i] += self.dBPP[i]
 
 		# record step
-		if hasattr(self, 'rec_per_steps'):
+		if hasattr(self, 'rec_per_steps') and record:
 			self.rec_counter += 1
 			if self.rec_counter % self.rec_per_steps == 0:
 				self.rec_counter = 0

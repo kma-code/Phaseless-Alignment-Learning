@@ -15,6 +15,7 @@ function_mappings = {
 # defines the voltage inits
 def init_voltages(layers, seed):
 
+	np.random.seed(seed)
 
 	uP_init = []
 	for i in range(1, len(layers)):
@@ -30,6 +31,7 @@ def init_voltages(layers, seed):
 # defines the weight inits
 def init_weights(layers, WPP_range, WIP_range, BPP_range, BPI_range, seed):
 
+	np.random.seed(seed)
 
 	# forward pp weights: connects all layers k, k+1
 	WPP_init = []

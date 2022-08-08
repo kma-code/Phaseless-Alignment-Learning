@@ -49,8 +49,9 @@ def calc_dWPP_ANN(mc, W_list, activation_list, d_activation_list, r0, target):
 	# backward pass:
 	dWPP_BP_list = [np.zeros_like(W) for W in W_list]
 
-	# calculate output error
-	error = np.diag(d_activation_list[-1](voltages[-1])) @ (target - rates[-1])
+	# calculate output error on voltage level at ouput
+	#error = np.diag(d_activation_list[-1](voltages[-1])) @ (target - rates[-1])
+	error = (target - voltages[-1])
 	# propagate error backwards
 	for i in range(len(dWPP_BP_list)-1, 0, -1):
 		dWPP_BP_list[i] = np.outer(error, rates[i-1])
@@ -64,7 +65,7 @@ def calc_dWPP_ANN(mc, W_list, activation_list, d_activation_list, r0, target):
 
 def compare_updates(mc, model, params):
 	"""
-		Compares updates of MC_list (list of trained microcircuit models)
+		Compares updates of mc (trained microcircuit model)
 		given input/output pairs with an ANN with same weights
 
 	"""
@@ -82,13 +83,15 @@ def compare_updates(mc, model, params):
 		MC_teacher[0].set_self_predicting_state()
 
 		logging.info(f'Teacher initialised with seed {MC_teacher[0].seed}')
-		MC_teacher = init_signals.init_r0(MC_list=MC_teacher, form=params["input_signal"], seed=MC_teacher[0].seed)
+		# MC_teacher = init_signals.init_r0(MC_list=MC_teacher, form=params["input_signal"], seed=MC_teacher[0].seed)
+		# copy input of mc to teacher
+		MC_teacher[0].input = mc.input
 		
 		logging.info(f'Running teacher to obtain target signal')
 		MC_teacher = [run_exp.run(MC_teacher[0], learn_weights=False, learn_lat_weights=False, learn_bw_weights=False, teacher=True)]
 
 		logging.info(f'Assigning input/target pairs of teacher to students')
-		mc = init_signals.init_r0(MC_list=[mc], form=params["input_signal"], seed=MC_teacher[0].seed)[0]
+		# mc = init_signals.init_r0(MC_list=[mc], form=params["input_signal"], seed=MC_teacher[0].seed)[0]
 		# for mc in MC_list:
 		# use uP_breve time series after settling time
 		mc.target = MC_teacher[0].target
@@ -99,7 +102,7 @@ def compare_updates(mc, model, params):
 
 		logging.info(f'Evaluating dWPP for microcircuit {mc}')
 		mc.dWPP_time_series_compare = [] 	# dWPP for this mc
-		mc.dWPP_time_series_ANN = []		# dWPP for ANN with fowrward weights of this mc
+		mc.dWPP_time_series_ANN = []		# dWPP for ANN with forward weights of this mc
 		mc.angle_updates_time_series = []	# angle between the entries of the above two lists
 
 		WPP_num = len(mc.WPP_time_series[TPRE:])	# length of WPP time series for progess counter
@@ -108,22 +111,22 @@ def compare_updates(mc, model, params):
 			logging.info(f"Evaluating next set of weights {time}/{WPP_num}")
 			# set network to weights at this time step
 			mc.set_weights(WPP=WPP, WIP=WIP, BPP=BPP, BPI=BPI)
+			# mc.set_self_predicting_state()
 
 			# run with input, output pairs and record dWPP
 			for i, (r0, target) in enumerate(zip(mc.input, mc.target)):
-				mc.evolve_system(r0=r0, u_tgt=target, learn_weights=False, learn_lat_weights=False, learn_bw_weights=False)
+				mc.evolve_system(r0=r0, u_tgt=target, learn_weights=False, learn_lat_weights=False, learn_bw_weights=False, record=False)
 				# record dWPP after every presentation time
-				if (i+1) % (mc.Tpres / mc.dt) == 0:
-					# get weights in MC and ANN
-					mc.dWPP_time_series_compare.append(mc.dWPP)
-					mc.dWPP_time_series_ANN.append(calc_dWPP_ANN(mc=mc, W_list=mc.WPP, activation_list=mc.activation, d_activation_list=d_activation_list, r0=r0, target=target))
+				# if (i+1) % (mc.Tpres / mc.dt) == 0:
+				# get weights in MC and ANN
+				mc.dWPP_time_series_compare.append(mc.dWPP)
+				mc.dWPP_time_series_ANN.append(calc_dWPP_ANN(mc=mc, W_list=mc.WPP, activation_list=mc.activation, d_activation_list=d_activation_list, r0=r0, target=target))
 
-					# calculate angle between weights
-					mc.angle_updates_time_series.append([
-						deg(cos_sim(mc_dWPP, BP_dWPP)) for mc_dWPP, BP_dWPP in zip(mc.dWPP_time_series_compare[-1], mc.dWPP_time_series_ANN[-1])
-						])
+				# calculate angle between weights
+				mc.angle_updates_time_series.append([
+					deg(cos_sim(mc_dWPP, BP_dWPP)) for mc_dWPP, BP_dWPP in zip(mc.dWPP_time_series_compare[-1], mc.dWPP_time_series_ANN[-1])
+					])
 
-		len(mc.angle_updates_time_series)
 		return mc
 
 

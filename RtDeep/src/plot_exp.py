@@ -416,10 +416,10 @@ def plot(MC_list, MC_teacher=None, path=None):
 			fig = plt.figure()
 			for mc, c in zip(MC_list, color):
 				plt.plot([vec[i] for vec in mc.angle_updates_time_series[TPRE:]], c=c)
-			plt.title("$\\angle (B^\\mathrm{PP}, \\varphi' (W^\\mathrm{PP})^T \\varphi')$ layer " + str(i+1))
+			plt.title("$\\angle (\\Delta W^\\mathrm{BP}, \\Delta W^\\mathrm{PP})$ layer " + str(i+1))
 			plt.ylabel("deg")
 			plt.grid()
-			plt.xlabel(str(MC_list[0].rec_per_steps) + ' dt')
+			# plt.xlabel(str(MC_list[0].rec_per_steps) + ' dt')
 			file_name = 'angle_MC_ANN'+str(i+1)+'.png'
 			plt.savefig(PATH + file_name, dpi=200) 
 
@@ -433,10 +433,10 @@ def plot(MC_list, MC_teacher=None, path=None):
 			x = np.arange(len(mean))
 
 			plt.plot(x, mean, c='k')
-			plt.title("$\\angle (B^\\mathrm{PP}, \\varphi' (W^\\mathrm{PP})^T \\varphi')$ layer " + str(i+1))
+			plt.title("$\\angle (\\Delta W^\\mathrm{BP}, \\Delta W^\\mathrm{PP})$ layer " + str(i+1))
 			plt.ylabel("deg")
 			plt.fill_between(x, mean+std, mean-std, color='gray', alpha=.5)
 			plt.grid()
-			plt.xlabel(str(MC_list[0].rec_per_steps) + ' dt')
+			# plt.xlabel(str(MC_list[0].rec_per_steps) + ' dt')
 			file_name = 'angle_MC_ANN'+str(i+1)+'_mean.png'
 			plt.savefig(PATH + file_name, dpi=200)
