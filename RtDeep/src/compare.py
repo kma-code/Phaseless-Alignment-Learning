@@ -132,7 +132,7 @@ def compare_updates(mc, model, params):
 					# get weights in MC and ANN
 					mc.dWPP_time_series_compare.append(mc.dWPP)
 					mc.dWPP_time_series_BP_ANN.append(calc_dWPP_ANN(algorithm="BP", mc=mc, W_list=mc.WPP, B_list=mc.BPP, activation_list=mc.activation, d_activation_list=d_activation_list, r0=r0, target=target))
-					mc.dWPP_time_series_FA_ANN.append(calc_dWPP_ANN(algorithm="FA", mc=mc, W_list=mc.WPP, B_list=mc.BPP, activation_list=mc.activation, d_activation_list=d_activation_list, r0=r0, target=target))
+					# mc.dWPP_time_series_FA_ANN.append(calc_dWPP_ANN(algorithm="FA", mc=mc, W_list=mc.WPP, B_list=mc.BPP, activation_list=mc.activation, d_activation_list=d_activation_list, r0=r0, target=target))
 
 					# calculate angle between weights
 					mc.angle_BP_updates_time_series.append([
@@ -140,9 +140,9 @@ def compare_updates(mc, model, params):
 						])
 
 					# calculate angle between weights
-					mc.angle_FA_updates_time_series.append([
-						deg(cos_sim(mc_dWPP, FA_dWPP)) for mc_dWPP, FA_dWPP in zip(mc.dWPP_time_series_compare[-1], mc.dWPP_time_series_FA_ANN[-1])
-						])
+					# mc.angle_FA_updates_time_series.append([
+					# 	deg(cos_sim(mc_dWPP, FA_dWPP)) for mc_dWPP, FA_dWPP in zip(mc.dWPP_time_series_compare[-1], mc.dWPP_time_series_FA_ANN[-1])
+					# 	])
 
 		return mc
 
