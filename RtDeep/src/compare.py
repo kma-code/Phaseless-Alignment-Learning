@@ -19,7 +19,7 @@ derivative_mappings = {
 }
 
 
-def calc_dWPP_ANN(mc, W_list, activation_list, d_activation_list, r0, target):
+def calc_dWPP_ANN(algorithm, mc, W_list, B_list, activation_list, d_activation_list, r0, target):
 	'''
 
 		Calculates the weight updates in an ANN using BP
@@ -32,6 +32,11 @@ def calc_dWPP_ANN(mc, W_list, activation_list, d_activation_list, r0, target):
 		Returns: list of updates dWPP in ANN
 
 	'''
+	if algorithm == 'BP':
+		B_list = [W.T for W in W_list]
+	elif algorithm == 'FA':
+		# we need to prepend one element because there is one B less defined in the microcircuit
+		B_list = [None] + B_list
 
 	# forward pass
 	# voltages correspond to vbashat
@@ -46,16 +51,20 @@ def calc_dWPP_ANN(mc, W_list, activation_list, d_activation_list, r0, target):
 	voltages[-1] = (mc.gbas + mc.gapi + mc.gl) / (mc.gbas + mc.gl) * voltages[-1]
 	rates[-1] = activation_list[-1](voltages[-1])
 
+	# voltages = deepcopy_array(mc.uP_breve)
+	# rates = deepcopy_array(mc.rP_breve)
+
 	# backward pass:
 	dWPP_BP_list = [np.zeros_like(W) for W in W_list]
 
-	# calculate output error on voltage level at ouput
-	#error = np.diag(d_activation_list[-1](voltages[-1])) @ (target - rates[-1])
-	error = (target - voltages[-1])
+	# calculate output error on rate level at ouput
+	error = np.diag(d_activation_list[-1](voltages[-1])) @ (target - rates[-1])
+	# alternatively, define error on voltages
+	# error = (target - voltages[-1])
 	# propagate error backwards
 	for i in range(len(dWPP_BP_list)-1, 0, -1):
 		dWPP_BP_list[i] = np.outer(error, rates[i-1])
-		error = np.diag(d_activation_list[i-1](voltages[i-1])) @ W_list[i].T @ error
+		error = np.diag(d_activation_list[i-1](voltages[i-1])) @ B_list[i] @ error
 	dWPP_BP_list[0] = np.outer(error, r0)
 
 	return dWPP_BP_list
@@ -102,8 +111,10 @@ def compare_updates(mc, model, params):
 
 		logging.info(f'Evaluating dWPP for microcircuit {mc}')
 		mc.dWPP_time_series_compare = [] 	# dWPP for this mc
-		mc.dWPP_time_series_ANN = []		# dWPP for ANN with forward weights of this mc
-		mc.angle_updates_time_series = []	# angle between the entries of the above two lists
+		mc.dWPP_time_series_BP_ANN = []		# dWPP for ANN with forward weights of this mc
+		mc.angle_BP_updates_time_series = []	# angle between the entries of the above two lists
+		mc.dWPP_time_series_FA_ANN = []		# dWPP for ANN with FA with weights of this mc
+		mc.angle_FA_updates_time_series = []	# angle between the entries of the above two lists
 
 		WPP_num = len(mc.WPP_time_series[TPRE:])	# length of WPP time series for progess counter
 
@@ -117,15 +128,21 @@ def compare_updates(mc, model, params):
 			for i, (r0, target) in enumerate(zip(mc.input, mc.target)):
 				mc.evolve_system(r0=r0, u_tgt=target, learn_weights=False, learn_lat_weights=False, learn_bw_weights=False, record=False)
 				# record dWPP after every presentation time
-				# if (i+1) % (mc.Tpres / mc.dt) == 0:
-				# get weights in MC and ANN
-				mc.dWPP_time_series_compare.append(mc.dWPP)
-				mc.dWPP_time_series_ANN.append(calc_dWPP_ANN(mc=mc, W_list=mc.WPP, activation_list=mc.activation, d_activation_list=d_activation_list, r0=r0, target=target))
+				if (i+1) % (mc.Tpres / mc.dt) == 0:
+					# get weights in MC and ANN
+					mc.dWPP_time_series_compare.append(mc.dWPP)
+					mc.dWPP_time_series_BP_ANN.append(calc_dWPP_ANN(algorithm="BP", mc=mc, W_list=mc.WPP, B_list=mc.BPP, activation_list=mc.activation, d_activation_list=d_activation_list, r0=r0, target=target))
+					mc.dWPP_time_series_FA_ANN.append(calc_dWPP_ANN(algorithm="FA", mc=mc, W_list=mc.WPP, B_list=mc.BPP, activation_list=mc.activation, d_activation_list=d_activation_list, r0=r0, target=target))
 
-				# calculate angle between weights
-				mc.angle_updates_time_series.append([
-					deg(cos_sim(mc_dWPP, BP_dWPP)) for mc_dWPP, BP_dWPP in zip(mc.dWPP_time_series_compare[-1], mc.dWPP_time_series_ANN[-1])
-					])
+					# calculate angle between weights
+					mc.angle_BP_updates_time_series.append([
+						deg(cos_sim(mc_dWPP, BP_dWPP)) for mc_dWPP, BP_dWPP in zip(mc.dWPP_time_series_compare[-1], mc.dWPP_time_series_BP_ANN[-1])
+						])
+
+					# calculate angle between weights
+					mc.angle_FA_updates_time_series.append([
+						deg(cos_sim(mc_dWPP, FA_dWPP)) for mc_dWPP, FA_dWPP in zip(mc.dWPP_time_series_compare[-1], mc.dWPP_time_series_FA_ANN[-1])
+						])
 
 		return mc
 

@@ -410,24 +410,24 @@ def plot(MC_list, MC_teacher=None, path=None):
 			file_name = 'angle_BPP_RHS'+str(i+1)+'_mean.png'
 			plt.savefig(PATH + file_name, dpi=200)
 
-	if hasattr(MC_list[0], "angle_updates_time_series"):
+	if hasattr(MC_list[0], "angle_BP_updates_time_series"):
 
-		for i in range(len(MC_list[0].angle_updates_time_series[0])):
+		for i in range(len(MC_list[0].angle_BP_updates_time_series[0])):
 			fig = plt.figure()
 			for mc, c in zip(MC_list, color):
-				plt.plot([vec[i] for vec in mc.angle_updates_time_series[TPRE:]], c=c)
+				plt.plot([vec[i] for vec in mc.angle_BP_updates_time_series[TPRE:]], c=c)
 			plt.title("$\\angle (\\Delta W^\\mathrm{BP}, \\Delta W^\\mathrm{PP})$ layer " + str(i+1))
 			plt.ylabel("deg")
 			plt.grid()
 			# plt.xlabel(str(MC_list[0].rec_per_steps) + ' dt')
-			file_name = 'angle_MC_ANN'+str(i+1)+'.png'
+			file_name = 'angle_MC_BP_ANN'+str(i+1)+'.png'
 			plt.savefig(PATH + file_name, dpi=200) 
 
 			# create a mean + std plot
 			fig = plt.figure()
 			data = []
 			for mc, c in zip(MC_list, color):
-				data.append([vec[i] for vec in mc.angle_updates_time_series[TPRE:]])
+				data.append([vec[i] for vec in mc.angle_BP_updates_time_series[TPRE:]])
 			mean = np.mean(data, axis=0)
 			std = np.std(data, axis=0)
 			x = np.arange(len(mean))
@@ -438,5 +438,36 @@ def plot(MC_list, MC_teacher=None, path=None):
 			plt.fill_between(x, mean+std, mean-std, color='gray', alpha=.5)
 			plt.grid()
 			# plt.xlabel(str(MC_list[0].rec_per_steps) + ' dt')
-			file_name = 'angle_MC_ANN'+str(i+1)+'_mean.png'
+			file_name = 'angle_MC_BP_ANN'+str(i+1)+'_mean.png'
+			plt.savefig(PATH + file_name, dpi=200)
+
+	if hasattr(MC_list[0], "angle_FA_updates_time_series"):
+
+		for i in range(len(MC_list[0].angle_FA_updates_time_series[0])):
+			fig = plt.figure()
+			for mc, c in zip(MC_list, color):
+				plt.plot([vec[i] for vec in mc.angle_FA_updates_time_series[TPRE:]], c=c)
+			plt.title("$\\angle (\\Delta W^\\mathrm{BP}, \\Delta W^\\mathrm{PP})$ layer " + str(i+1))
+			plt.ylabel("deg")
+			plt.grid()
+			# plt.xlabel(str(MC_list[0].rec_per_steps) + ' dt')
+			file_name = 'angle_MC_FA_ANN'+str(i+1)+'.png'
+			plt.savefig(PATH + file_name, dpi=200) 
+
+			# create a mean + std plot
+			fig = plt.figure()
+			data = []
+			for mc, c in zip(MC_list, color):
+				data.append([vec[i] for vec in mc.angle_FA_updates_time_series[TPRE:]])
+			mean = np.mean(data, axis=0)
+			std = np.std(data, axis=0)
+			x = np.arange(len(mean))
+
+			plt.plot(x, mean, c='k')
+			plt.title("$\\angle (\\Delta W^\\mathrm{BP}, \\Delta W^\\mathrm{PP})$ layer " + str(i+1))
+			plt.ylabel("deg")
+			plt.fill_between(x, mean+std, mean-std, color='gray', alpha=.5)
+			plt.grid()
+			# plt.xlabel(str(MC_list[0].rec_per_steps) + ' dt')
+			file_name = 'angle_MC_FA_ANN'+str(i+1)+'_mean.png'
 			plt.savefig(PATH + file_name, dpi=200)
