@@ -113,13 +113,15 @@ def compare_updates(mc, model, params):
 		mc.dWPP_time_series_compare = [] 	# dWPP for this mc
 		mc.dWPP_time_series_BP_ANN = []		# dWPP for ANN with forward weights of this mc
 		mc.angle_BP_updates_time_series = []	# angle between the entries of the above two lists
-		mc.dWPP_time_series_FA_ANN = []		# dWPP for ANN with FA with weights of this mc
-		mc.angle_FA_updates_time_series = []	# angle between the entries of the above two lists
+		# mc.dWPP_time_series_FA_ANN = []		# dWPP for ANN with FA with weights of this mc
+		# mc.angle_FA_updates_time_series = []	# angle between the entries of the above two lists
 
-		WPP_num = len(mc.WPP_time_series[TPRE:])	# length of WPP time series for progess counter
+		WPP_per_steps = int(len(mc.WPP_time_series[TPRE:]) / mc.epochs)	# evaluate WPP once per epoch
+		if WPP_per_steps == 1:
+			WPP_per_steps = None
 
-		for time, (WPP, WIP, BPP, BPI) in enumerate(zip(mc.WPP_time_series[TPRE:], mc.WIP_time_series[TPRE:], mc.BPP_time_series[TPRE:], mc.BPI_time_series[TPRE:])):
-			logging.info(f"Evaluating next set of weights {time}/{WPP_num}")
+		for time, (WPP, WIP, BPP, BPI) in enumerate(zip(mc.WPP_time_series[TPRE:][::WPP_per_steps], mc.WIP_time_series[TPRE:][::WPP_per_steps], mc.BPP_time_series[TPRE:][::WPP_per_steps], mc.BPI_time_series[TPRE:][::WPP_per_steps])):
+			logging.info(f"Evaluating next set of weights {time}/{mc.epochs}")
 			# set network to weights at this time step
 			mc.set_weights(WPP=WPP, WIP=WIP, BPP=BPP, BPI=BPI)
 			# mc.set_self_predicting_state()
