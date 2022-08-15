@@ -44,28 +44,28 @@ def calc_dWPP_ANN(algorithm, mc, W_list, B_list, activation_list, d_activation_l
 	rates = [np.zeros_like(vec) for vec in mc.rP_breve]
 	voltages[0] = W_list[0] @ r0
 
-	for i in range(len(W_list)-1):
-		rates[i] = activation_list[i](voltages[i])
-		voltages[i+1] = mc.gbas / (mc.gbas + mc.gapi + mc.gl) * W_list[i+1] @ rates[i]
-	# correct output layer voltage
-	voltages[-1] = (mc.gbas + mc.gapi + mc.gl) / (mc.gbas + mc.gl) * voltages[-1]
-	rates[-1] = activation_list[-1](voltages[-1])
+	# for i in range(len(W_list)-1):
+	# 	rates[i] = activation_list[i](voltages[i])
+	# 	voltages[i+1] = mc.gbas / (mc.gbas + mc.gapi + mc.gl) * W_list[i+1] @ rates[i]
+	# # correct output layer voltage
+	# voltages[-1] = (mc.gbas + mc.gapi + mc.gl) / (mc.gbas + mc.gl) * voltages[-1]
+	# rates[-1] = activation_list[-1](voltages[-1])
 
-	# voltages = deepcopy_array(mc.uP_breve)
-	# rates = deepcopy_array(mc.rP_breve)
+	voltages = deepcopy_array(mc.uP_breve)
+	rates = deepcopy_array(mc.rP_breve)
 
 	# backward pass:
 	dWPP_BP_list = [np.zeros_like(W) for W in W_list]
 
 	# calculate output error on rate level at ouput
-	error = np.diag(d_activation_list[-1](voltages[-1])) @ (target - rates[-1])
+	# error = np.diag(d_activation_list[-1](voltages[-1])) @ (target - rates[-1])
 	# alternatively, define error on voltages
-	# error = (target - voltages[-1])
+	error = (target - voltages[-1])
 	# propagate error backwards
 	for i in range(len(dWPP_BP_list)-1, 0, -1):
-		dWPP_BP_list[i] = np.outer(error, rates[i-1])
+		dWPP_BP_list[i] = - np.outer(error, rates[i-1])
 		error = np.diag(d_activation_list[i-1](voltages[i-1])) @ B_list[i] @ error
-	dWPP_BP_list[0] = np.outer(error, r0)
+	dWPP_BP_list[0] = - np.outer(error, r0)
 
 	return dWPP_BP_list
 
@@ -87,8 +87,9 @@ def compare_updates(mc, model, params):
 
 	if model == "BP":
 
-		# generate an input/target sequence
+		# make a teacher with same forward weights as mc
 		MC_teacher = init_MC.init_MC(params, params['random_seed'], teacher=True)
+		MC_teacher[0].set_weights(WPP=mc.WPP)
 		MC_teacher[0].set_self_predicting_state()
 
 		logging.info(f'Teacher initialised with seed {MC_teacher[0].seed}')
@@ -97,6 +98,7 @@ def compare_updates(mc, model, params):
 		MC_teacher[0].input = mc.input
 		
 		logging.info(f'Running teacher to obtain target signal')
+		# generate an input/target sequence
 		MC_teacher = [run_exp.run(MC_teacher[0], learn_weights=False, learn_lat_weights=False, learn_bw_weights=False, teacher=True)]
 
 		logging.info(f'Assigning input/target pairs of teacher to students')
