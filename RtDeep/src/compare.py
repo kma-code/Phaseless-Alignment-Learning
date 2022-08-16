@@ -87,6 +87,11 @@ def compare_updates(mc, model, params):
 
 	if model == "BP":
 
+		if mc.model == 'LDRL':
+			# disable noise for PAL evaluation
+			mc.noise_scale = [0 for _ in mc.noise_scale]
+			mc.noise = [np.zeros_like(noise) for noise in mc.noise]
+
 		# make a teacher with same forward weights as mc
 		MC_teacher = init_MC.init_MC(params, params['random_seed'], teacher=True)
 		MC_teacher[0].set_weights(WPP=mc.WPP)
@@ -126,7 +131,9 @@ def compare_updates(mc, model, params):
 			logging.info(f"Evaluating next set of weights {time}/{mc.epochs}")
 			# set network to weights at this time step
 			mc.set_weights(WPP=WPP, WIP=WIP, BPP=BPP, BPI=BPI)
-			# mc.set_self_predicting_state()
+			mc.set_self_predicting_state()
+
+			# mc_BP.set_weights
 
 			# run with input, output pairs and record dWPP
 			for i, (r0, target) in enumerate(zip(mc.input, mc.target)):
@@ -143,10 +150,10 @@ def compare_updates(mc, model, params):
 						deg(cos_sim(mc_dWPP, BP_dWPP)) for mc_dWPP, BP_dWPP in zip(mc.dWPP_time_series_compare[-1], mc.dWPP_time_series_BP_ANN[-1])
 						])
 
-					# calculate angle between weights
-					# mc.angle_FA_updates_time_series.append([
-					# 	deg(cos_sim(mc_dWPP, FA_dWPP)) for mc_dWPP, FA_dWPP in zip(mc.dWPP_time_series_compare[-1], mc.dWPP_time_series_FA_ANN[-1])
-					# 	])
+				# calculate angle between weights
+				# mc.angle_FA_updates_time_series.append([
+				# 	deg(cos_sim(mc_dWPP, FA_dWPP)) for mc_dWPP, FA_dWPP in zip(mc.dWPP_time_series_compare[-1], mc.dWPP_time_series_FA_ANN[-1])
+				# 	])
 
 		return mc
 
