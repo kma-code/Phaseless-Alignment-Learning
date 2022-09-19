@@ -42,30 +42,32 @@ def calc_dWPP_ANN(algorithm, mc, W_list, B_list, activation_list, d_activation_l
 	# voltages correspond to vbashat
 	voltages = [np.zeros_like(vec) for vec in mc.uP_breve]
 	rates = [np.zeros_like(vec) for vec in mc.rP_breve]
-	voltages[0] = W_list[0] @ r0
+	voltages[0] = mc.gbas / (mc.gbas + mc.gapi + mc.gl) * W_list[0] @ r0
 
-	# for i in range(len(W_list)-1):
-	# 	rates[i] = activation_list[i](voltages[i])
-	# 	voltages[i+1] = mc.gbas / (mc.gbas + mc.gapi + mc.gl) * W_list[i+1] @ rates[i]
-	# # correct output layer voltage
-	# voltages[-1] = (mc.gbas + mc.gapi + mc.gl) / (mc.gbas + mc.gl) * voltages[-1]
-	# rates[-1] = activation_list[-1](voltages[-1])
+	for i in range(len(W_list)-1):
+		rates[i] = activation_list[i](voltages[i])
+		# calculate vbashat
+		voltages[i+1] = mc.gbas / (mc.gbas + mc.gapi + mc.gl) * W_list[i+1] @ rates[i]
+	# correct output layer voltage
+	voltages[-1] = (mc.gbas + mc.gapi + mc.gl) / (mc.gbas + mc.gl) * voltages[-1]
+	rates[-1] = activation_list[-1](voltages[-1])
 
-	voltages = deepcopy_array(mc.uP_breve)
-	rates = deepcopy_array(mc.rP_breve)
+	# voltages = deepcopy_array(mc.uP_breve)
+	# rates = deepcopy_array(mc.rP_breve)
 
 	# backward pass:
 	dWPP_BP_list = [np.zeros_like(W) for W in W_list]
 
 	# calculate output error on rate level at ouput
 	# error = np.diag(d_activation_list[-1](voltages[-1])) @ (target - rates[-1])
+	# error = np.diag(d_activation_list[-1](voltages[-1])) @ (target - voltages[-1])
 	# alternatively, define error on voltages
 	error = (target - voltages[-1])
 	# propagate error backwards
 	for i in range(len(dWPP_BP_list)-1, 0, -1):
-		dWPP_BP_list[i] = - np.outer(error, rates[i-1])
+		dWPP_BP_list[i] = np.outer(error, rates[i-1])
 		error = np.diag(d_activation_list[i-1](voltages[i-1])) @ B_list[i] @ error
-	dWPP_BP_list[0] = - np.outer(error, r0)
+	dWPP_BP_list[0] = np.outer(error, r0)
 
 	return dWPP_BP_list
 
@@ -94,7 +96,6 @@ def compare_updates(mc, model, params):
 
 		# make a teacher with same forward weights as mc
 		MC_teacher = init_MC.init_MC(params, params['random_seed'], teacher=True)
-		MC_teacher[0].set_weights(WPP=mc.WPP)
 		MC_teacher[0].set_self_predicting_state()
 
 		logging.info(f'Teacher initialised with seed {MC_teacher[0].seed}')
@@ -127,7 +128,7 @@ def compare_updates(mc, model, params):
 		if WPP_per_steps == 1:
 			WPP_per_steps = None
 
-		for time, (WPP, WIP, BPP, BPI) in enumerate(zip(mc.WPP_time_series[TPRE:][::WPP_per_steps], mc.WIP_time_series[TPRE:][::WPP_per_steps], mc.BPP_time_series[TPRE:][::WPP_per_steps], mc.BPI_time_series[TPRE:][::WPP_per_steps])):
+		for time, (WPP, WIP, BPP, BPI) in enumerate(zip(mc.WPP_time_series[TPRE:][::WPP_per_steps][-1:], mc.WIP_time_series[TPRE:][::WPP_per_steps][-1:], mc.BPP_time_series[TPRE:][::WPP_per_steps][-1:], mc.BPI_time_series[TPRE:][::WPP_per_steps][-1:])):
 			logging.info(f"Evaluating next set of weights {time}/{mc.epochs}")
 			# set network to weights at this time step
 			mc.set_weights(WPP=WPP, WIP=WIP, BPP=BPP, BPI=BPI)
@@ -137,7 +138,7 @@ def compare_updates(mc, model, params):
 
 			# run with input, output pairs and record dWPP
 			for i, (r0, target) in enumerate(zip(mc.input, mc.target)):
-				mc.evolve_system(r0=r0, u_tgt=target, learn_weights=False, learn_lat_weights=False, learn_bw_weights=False, record=False)
+				mc.evolve_system(r0=r0, u_tgt=[target], learn_weights=False, learn_lat_weights=False, learn_bw_weights=False, record=False)
 				# record dWPP after every presentation time
 				if (i+1) % (mc.Tpres / mc.dt) == 0:
 					# get weights in MC and ANN
