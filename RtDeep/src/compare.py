@@ -52,9 +52,6 @@ def calc_dWPP_ANN(algorithm, mc, W_list, B_list, activation_list, d_activation_l
 	voltages[-1] = (mc.gbas + mc.gapi + mc.gl) / (mc.gbas + mc.gl) * voltages[-1]
 	rates[-1] = activation_list[-1](voltages[-1])
 
-	# voltages = deepcopy_array(mc.uP_breve)
-	# rates = deepcopy_array(mc.rP_breve)
-
 	# backward pass:
 	dWPP_BP_list = [np.zeros_like(W) for W in W_list]
 
@@ -128,7 +125,7 @@ def compare_updates(mc, model, params):
 		if WPP_per_steps == 1:
 			WPP_per_steps = None
 
-		for time, (WPP, WIP, BPP, BPI) in enumerate(zip(mc.WPP_time_series[TPRE:][::WPP_per_steps][-1:], mc.WIP_time_series[TPRE:][::WPP_per_steps][-1:], mc.BPP_time_series[TPRE:][::WPP_per_steps][-1:], mc.BPI_time_series[TPRE:][::WPP_per_steps][-1:])):
+		for time, (WPP, WIP, BPP, BPI) in enumerate(zip(mc.WPP_time_series[TPRE:][::WPP_per_steps], mc.WIP_time_series[TPRE:][::WPP_per_steps], mc.BPP_time_series[TPRE:][::WPP_per_steps], mc.BPI_time_series[TPRE:][::WPP_per_steps])):
 			logging.info(f"Evaluating next set of weights {time}/{mc.epochs}")
 			# set network to weights at this time step
 			mc.set_weights(WPP=WPP, WIP=WIP, BPP=BPP, BPI=BPI)
