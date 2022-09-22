@@ -125,7 +125,7 @@ def compare_updates(mc, model, params):
 		if WPP_per_steps == 1:
 			WPP_per_steps = None
 
-		for time, (WPP, WIP, BPP, BPI) in enumerate(zip(mc.WPP_time_series[TPRE:][::WPP_per_steps], mc.WIP_time_series[TPRE:][::WPP_per_steps], mc.BPP_time_series[TPRE:][::WPP_per_steps], mc.BPI_time_series[TPRE:][::WPP_per_steps])):
+		for time, (WPP, WIP, BPP, BPI) in enumerate(zip(mc.WPP_time_series[TPRE:][::WPP_per_steps][-1:], mc.WIP_time_series[TPRE:][::WPP_per_steps][-1:], mc.BPP_time_series[TPRE:][::WPP_per_steps][-1:], mc.BPI_time_series[TPRE:][::WPP_per_steps][-1:])):
 			logging.info(f"Evaluating next set of weights {time}/{mc.epochs}")
 			# set network to weights at this time step
 			mc.set_weights(WPP=WPP, WIP=WIP, BPP=BPP, BPI=BPI)
