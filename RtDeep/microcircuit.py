@@ -39,6 +39,16 @@ def hard_sigmoid(x):
 def d_hard_sigmoid(x):
 	return np.heaviside(x/6 + 1/2, 0) * np.heaviside(1 - (x/6 + 1/2), 0)
 
+# define dict between activations and derivatives
+dict_d_activation = {
+	linear: d_linear,
+	relu: d_relu,
+	soft_relu: d_soft_relu,
+	logistic: d_logistic,
+	tanh: d_tanh,
+	hard_sigmoid: d_hard_sigmoid
+}
+
 # cosine similarity between tensors
 def cos_sim(A, B):
 	if A.ndim == 1 and B.ndim == 1:
@@ -735,6 +745,8 @@ class noise_model(base_model):
 
 		self.rng = np.random.RandomState(seed)
 
+		self.d_activation = [dict_d_activation[activation] for activation in self.activation]
+
 		# type of noise (OU or white)
 		self.noise_type = noise_type
 		# mode of noise injection (order vapi or uP or uP_adative)
@@ -759,6 +771,10 @@ class noise_model(base_model):
 		self.dWPP_post_low_pass = dWPP_post_low_pass
 		# whether to gate application of the regularizer
 		self.gate_regularizer = gate_regularizer
+		# whether to use phi' B phi' as regularizer
+		self.varphi_regularizer = kwargs.get('varphi_regularizer', False)
+		if self.varphi_regularizer:
+			self.d_rP = [np.diag(np.zeros(shape=uP.shape)) for uP in self.uP]
 		# noise time scale
 		self.dtxi = dtxi
 		# decimals of dt
@@ -1061,6 +1077,10 @@ class noise_model(base_model):
 
 		self.dBPP = [np.zeros(shape=BPP.shape) for BPP in self.BPP]
 
+		if self.varphi_regularizer:
+			for i in range(len(self.BPP)):
+				self.d_rP[i] = np.diag(self.d_activation[i](self.uP_breve[i]))
+
 		for i in range(len(self.BPP)):
 			if self.bw_connection_mode == 'skip':
 				if self.pyr_hi_pass:
@@ -1074,55 +1094,19 @@ class noise_model(base_model):
 					r_pre = self.rP_breve[i+1]
 
 			if self.model == "LDRL":
-				if self.pyr_hi_pass:
-					self.dBPP[i] = self.dt * self.eta_bw[i] * np.outer(
-						self.noise[i], r_pre
-						)
-					# add regularizer with gate or without
-					if self.gate_regularizer:
-						self.dBPP[i] -= self.dt * self.alpha[i] * \
-							self.eta_bw[i] * self.BPP[i] * d_relu(r_pre)
-					else:
-						self.dBPP[i] -= self.dt * self.alpha[i] * self.eta_bw[i] * self.BPP[i]
-
+				self.dBPP[i] = self.dt * self.eta_bw[i] * np.outer(
+					self.noise[i], r_pre
+					)
+				# add regularizer with gate or without
+				if self.gate_regularizer:
+					self.dBPP[i] -= self.dt * self.alpha[i] * \
+						self.eta_bw[i] * self.BPP[i] * d_relu(r_pre)
 				else:
-					self.dBPP[i] = self.dt * self.eta_bw[i] * np.outer(
-						self.noise[i], r_pre
-						)
-					# add regularizer with gate or without
-					if self.gate_regularizer:
-						self.dBPP[i] -= self.dt * self.alpha[i] * \
-							self.eta_bw[i] * self.BPP[i] * d_relu(r_pre)
+					if self.varphi_regularizer:
+						self.dBPP[i] -= self.dt * self.alpha[i] * self.eta_bw[i] * self.d_rP[i] @ self.BPP[i] @ self.d_rP[i+1]
 					else:
+					# vanilla regularizer
 						self.dBPP[i] -= self.dt * self.alpha[i] * self.eta_bw[i] * self.BPP[i]
-				
-
-			# THIS MODE NOT IMPLEMENTED CURRENTLY 
-			# elif self.model == "DTPDRL":
-			# 	if self.pyr_hi_pass:
-			# 		if np.linalg.norm(self.noise[i]) != 0.0:
-			# 			self.dBPP[i] = - self.dt * self.eta_bw[i] * np.outer(
-			# 				self.BPP[i] @ self.rP_breve_HI[-1] - self.noise[i],
-			# 				self.rP_breve_HI[-1]
-			# 				)
-			# 		# add regularizer with gate or without
-			# 		if self.gate_regularizer:
-			# 			self.dBPP[i] -= self.dt * self.alpha[i] * \
-			# 				self.eta_bw[i] * self.BPP[i] * d_relu(self.rP_breve_HI[-1])
-			# 		else:
-			# 			self.dBPP[i] -= self.dt * self.alpha[i] * self.eta_bw[i] * self.BPP[i]
-
-			# 	else:
-			# 		self.dBPP[i] = - self.dt * self.eta_bw[i] * np.outer(
-			# 			self.BPP[i] @ self.rP_breve[-1] + self.BPI[i] @ self.rI_breve[-1] - self.noise[i],
-			# 			self.rP_breve[-1]
-			# 			)
-			# 		# add regularizer with gate or without
-			# 		if self.gate_regularizer:
-			# 			self.dBPP[i] -= self.dt * self.alpha[i] * \
-			# 				self.eta_bw[i] * self.BPP[i] * d_relu(self.rP_breve[-1])
-			# 		else:
-			# 			self.dBPP[i] -= self.dt * self.alpha[i] * self.eta_bw[i] * self.BPP[i]
 
 
 		return self.dBPP

@@ -135,6 +135,7 @@ def init_MC(params, seeds, teacher=False):
 			noise_deg = params["noise_deg"] if "noise_deg" in params else None
 			taueps = params["taueps"] if "taueps" in params else None
 			tauxi = params["tauxi"] if "tauxi" in params else None
+			varphi_regularizer = params["varphi_regularizer"] if "varphi_regularizer" in params else False
 
 			MC_list.append(
 				noise_model(
@@ -182,7 +183,8 @@ def init_MC(params, seeds, teacher=False):
 
 					noise_deg=noise_deg,
 					taueps=taueps,
-					tauxi=tauxi
+					tauxi=tauxi,
+					varphi_regularizer=varphi_regularizer
 
 					)
 				)
