@@ -121,13 +121,6 @@ def main(params, task='fw_bw', seeds=[667], load=None, compare_model=None):
 		t_diff = time.time() - t_start
 		logging.info(f'Training finished in {t_diff}s.')
 
-		logging.info(f'Saving results')
-		if task == 'fw_bw':
-			# if teacher is loaded, append to list of microcircuits
-			save_exp.save(MC_teacher + MC_list,path=PATH)
-		else:
-			save_exp.save(MC_list, path=PATH)
-
 	else:
 		logging.info(f'Loading results from {load}')
 		MC_list = save_exp.load(load)
@@ -154,6 +147,13 @@ def main(params, task='fw_bw', seeds=[667], load=None, compare_model=None):
 		MC_list = compare.compare_jacobians(MC_list=MC_list, model=compare_model)
 		# create angle between BPP and phi' WPP.T phi'
 		MC_list = compare.compare_BPP_RHS(MC_list=MC_list, model=compare_model)
+
+	logging.info(f'Saving results')
+		if task == 'fw_bw':
+			# if teacher is loaded, append to list of microcircuits
+			save_exp.save(MC_teacher + MC_list,path=PATH)
+		else:
+			save_exp.save(MC_list, path=PATH)
 
 
 	logging.info(f'Plotting results')
