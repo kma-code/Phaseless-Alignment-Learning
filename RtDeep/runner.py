@@ -149,11 +149,11 @@ def main(params, task='fw_bw', seeds=[667], load=None, compare_model=None):
 		MC_list = compare.compare_BPP_RHS(MC_list=MC_list, model=compare_model)
 
 	logging.info(f'Saving results')
-		if task == 'fw_bw':
-			# if teacher is loaded, append to list of microcircuits
-			save_exp.save(MC_teacher + MC_list,path=PATH)
-		else:
-			save_exp.save(MC_list, path=PATH)
+	if task == 'fw_bw':
+		# if teacher is loaded, append to list of microcircuits
+		save_exp.save(MC_teacher + MC_list,path=PATH)
+	else:
+		save_exp.save(MC_list, path=PATH)
 
 
 	logging.info(f'Plotting results')
