@@ -1100,7 +1100,7 @@ class noise_model(base_model):
 				else:
 					r_pre = self.rP_breve[i+1]
 
-			if self.model == "LDRL":
+			if self.model == "PAL":
 				self.dBPP[i] = self.dt * self.eta_bw[i] * np.outer(
 					self.noise[i], r_pre
 					)

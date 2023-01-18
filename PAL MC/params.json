@@ -21,17 +21,17 @@
     "_comment": "implemented activations: logistic, hard_sigmoid, relu, soft_relu, linear, tanh",
     "activation": "logistic",
 
-    "_comment": "implemented models: BP, FA, DTPDRL or LDRL",
-    "model_type": "LDRL",
+    "_comment": "implemented models: BP, FA or PAL",
+    "model_type": "PAL",
 
-    "_comment": "DTPDRL-only: noise type: white noise held or OU",
+    "_comment": "PAL: noise type: white noise held or OU",
     "noise_type": "OU",
-     "_comment": "DTPDRL-only: sampled noise is rescaled by noise_scale",
+     "_comment": "PAL: sampled noise is rescaled by noise_scale",
     "noise_scale": [1e-2],
-    "_comment": "DTPDRL and uP_adaptive-only: noise_deg is the angle of alignment between uP_breve_i and BPP_iL * rP_breve_L below which no noise is injected",
+    "_comment": "PAL and uP_adaptive-only: noise_deg is the angle of alignment between uP_breve_i and BPP_iL * rP_breve_L below which no noise is injected",
     "_comment": "                             i.e. we are satisfied with this amount of alignment",
     "noise_deg": 30,
-    "_comment": "DTPDRL-only: implemented modes: uP (scale noise with uP), vapi (scale noise with vapi) and uP_adaptive (scale noise with uP and angle of alignment)",
+    "_comment": "PAL: implemented modes: uP (scale noise with uP), vapi (scale noise with vapi) and uP_adaptive (scale noise with uP and angle of alignment)",
     "noise_mode": "const",
 
     "gl": 0.03,
@@ -118,7 +118,8 @@
     "rec_vapi_noise": false,
     "rec_noise": false,
     "rec_epsilon": false,
-    "rec_epsilon_LO": false
+    "rec_epsilon_LO": false,
+    "rec_lat_mismatch": false
 
 }
 
