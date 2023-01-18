@@ -62,7 +62,7 @@ After loading this, `input[0]` represents the teacher model (if it was initiated
 
 # Commands to reproduce plots
 
-Fig3abc: `python runner.py --params experiments/Fig3abc/params.json --task bw_only --compare BP`
-Fig3def: `python runner.py --params experiments/Fig3def/params.json --task bw_only --compare BP`
-Fig4ab: `python runner.py --params experiments/Fig4ab/PAL/params.json --task fw_bw --compare BP`
+- Fig3abc: `python runner.py --params experiments/Fig3abc/params.json --task bw_only --compare BP`
+- Fig3def: `python runner.py --params experiments/Fig3def/params.json --task bw_only --compare BP`
+- Fig4ab: `python runner.py --params experiments/Fig4ab/PAL/params.json --task fw_bw --compare BP`
 
