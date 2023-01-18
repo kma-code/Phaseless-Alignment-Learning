@@ -9,8 +9,8 @@ Defintions of the classes `base_model` and `noise_model` are given in `microcirc
 Parameters:
 
 Tasks currently implemented:
-- learning the backwards weights with no teaching signal
-- feeding input into a teacher network, recording its output; feeding same input into learning network and learning the forward and backward weights simultaneously.
+- 'bw_only': learning the backwards weights with no teaching signal
+- 'fw_bw': feeding input into a teacher network, recording its output; feeding same input into learning network and learning the forward and backward weights simultaneously.
 
 Input signal:
 - Steps sampled from U[0,1] held for Tpres
