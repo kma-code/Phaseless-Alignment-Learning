@@ -31,6 +31,7 @@ You can either make an experiment using the template:
 - change any parameter in `params.json`
 - run with `python runner.py --params run01/params.json --task bw_only` for bw weights only (no teacher)
    or with `python runner.py --params run01/params.json --task fw_bw` for fw and bw weight learning (with teacher)
+- if
 - all plots are saved in `run01`, together with a `model.pkl` file of the microcircuit class objects after training
 
 Or use one of the files for the figures in the plot. Go through the above steps with one of the params.json files in the folder [experiments](https://github.com/kma-code/Phaseless-Alignment-Learning/tree/master/PAL%20MC/experiments).
@@ -58,4 +59,10 @@ import pickle
 with open('run03_teacher/model.pkl', 'rb') as f: input = pickle.load(f)
 ```
 After loading this, `input[0]` represents the teacher model (if it was initiated) and other elements are student networks.
+
+# Commands to reproduce plots
+
+Fig3abc: `python runner.py --params experiments/Fig3abc/params.json --task bw_only --compare BP`
+Fig3def: `python runner.py --params experiments/Fig3def/params.json --task bw_only --compare BP`
+Fig4ab: `python runner.py --params experiments/Fig4ab/PAL/params.json --task fw_bw --compare BP`
 
