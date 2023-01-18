@@ -1,12 +1,30 @@
 # Experiments on learning the backward weights using cortical microcircuits
 
-This folder contains all files to reproduce several experiments with microcircuits.
+This folder contains all files to reproduce several experiments with dendritic cortical microcircuits.
+
+Nomenclature:
+- base variable `uP` is the array of vectors of somatic potentials of pyramidal cells
+- base variable `uI` is the array of vectors of somatic potentials of interneurons
+- variables with `_breve` are the lookahead of base variables
+- `rX_breve` is the instantaneous rate based on a the corresponding lookahead voltage `uX_breve`
+- `WPP` are weights connecting pyramidal neurons in one layer to the next (including input to first layer)
+- `BPP` are weights connecting pyramidal neurons in one layer to pyramidal cells in layer below
+- `WIP` are lateral weights from pyramidal cells to interneurons
+- `BPI` are lateral weights form interneurons to pyramidal cells (called `WPI` in arXiv:1810.11393)
 
 Defintions of the classes `base_model` and `noise_model` are given in `microcircuit.py`.
-- `base_model` implements backprop (by setting WPP = BPP.T) and feedback alignment as in arXiv:1810.11393
+- `base_model` implements backprop (by setting WPP = BPP.T) and feedback alignment on the classic dendritic MC model of arXiv:1810.11393
 - `noise_model` implements our algorithm PAL to learn BPP
 
-Parameters:
+Parameters: see `params.json` example file.
+- `dt`: step size for Euler solver in ms. Standard: `1e-2`
+- `Tpres`: presentation time in ms. Standard: `1` 
+
+Relevant parameters for PAL:
+- `dtxi`: after how many ms to sample new noise. Standard: set to `dt`.
+- `tauxi`: time constant of Ornstein-Uhlenbeck noise. Standard: `10 * dt`
+- `tauHP`: time constant of high-pass filter. Standard: `10 * dt`
+- `tauLO`: time constant of low-pass filter of synaptic weight updates. Standard: `1e+4 * dt`
 
 Tasks currently implemented:
 - 'bw_only': learning the backwards weights with no teaching signal
