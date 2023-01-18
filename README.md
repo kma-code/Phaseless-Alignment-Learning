@@ -5,7 +5,7 @@ Paper "Learning efficient backprojections across cortical hierarchies in real ti
 
 Three separate setups were used for experiments:
 
-1) Figures 3 and 4a,b: Dendritic microcircuit simulator. [THIS REPO](https://github.com/kma-code/Pseudo-backprop-Lab/tree/master/PAL)
+1) Figures 3 and 4a,b: Dendritic microcircuit simulator. [THIS REPO](https://github.com/kma-code/Pseudo-backprop-Lab/tree/master/PAL%20MC)
 2) Figures 4c,d,e,f: Dendritic microcircuit simulator based on GeNN. LINK TO REPO (available shortly)
 3) Figure 5: Based on Generalized Latent Equilibrium codebase. LINK TO REPO (available shortly)
 
