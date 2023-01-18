@@ -232,6 +232,24 @@ def plot(MC_list, MC_teacher=None, path=None):
 			file_name = 'vapi_layer'+str(i+1)+'.png'
 			plt.savefig(PATH + file_name, dpi=200)
 
+	if MC_list[0].rec_lat_mismatch:
+
+		for i in range(len(MC_list[0].layers)-2):
+			fig = plt.figure()
+			for mc, c in zip(MC_list, color):
+				for j in range(len(mc.lat_mismatch_time_series[0][i])):
+					plt.plot(np.array([vec[i][j] for vec in mc.lat_mismatch_time_series[TPRE:]]), c=c)
+					if MC_teacher is not None:
+						data = np.array([vec[i][j] for vec in MC_teacher[0].lat_mismatch_time_series[TPRE:]])
+						data = np.tile(data, MC_list[0].epochs)
+						plt.plot(data, c=CLR_TEACH, ls='--')
+			plt.title("$\\breve{u}^\\mathrm{I} - \\widehat{v}^\\mathrm{bas}$, layer " + str(i+1))
+			# plt.grid()
+			# plt.ylim(0,1)
+			plt.xlabel(str(MC_list[0].rec_per_steps) + ' dt')
+			file_name = 'lat_mismatch_layer'+str(i+1)+'.png'
+			plt.savefig(PATH + file_name, dpi=200)
+
 	if MC_list[0].rec_vapi_noise:
 
 		for i in range(len(MC_list[0].layers)-2):

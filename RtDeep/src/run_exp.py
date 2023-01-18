@@ -38,7 +38,8 @@ def run(mc, learn_weights=True, learn_lat_weights=True, learn_bw_weights=True, t
 		rec_vapi_noise=mc.rec_vapi_noise,
 		rec_epsilon=mc.rec_epsilon,
 		rec_noise=mc.rec_noise,
-		rec_epsilon_LO=mc.rec_epsilon_LO)
+		rec_epsilon_LO=mc.rec_epsilon_LO,
+		rec_lat_mismatch=mc.rec_lat_mismatch)
 
 	# if the mc is the teacher, record target signal
 	if teacher:
@@ -102,6 +103,7 @@ def training(mc, r0_arr, epochs=1, learn_weights=True, learn_lat_weights=True, l
 			
 
 		for i in range(len(r0_arr)):
+			# mc.set_self_predicting_state()
 			# if mc is teacher, evolve and record
 			if teacher:
 				mc.target.append(copy.deepcopy(mc.uP_breve[-1]))
