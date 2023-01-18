@@ -16,10 +16,9 @@ Defintions of the classes `base_model` and `noise_model` are given in `microcirc
 - `base_model` implements backprop (by setting WPP = BPP.T) and feedback alignment on the classic dendritic MC model of arXiv:1810.11393
 - `noise_model` implements our algorithm PAL to learn BPP
 
-Parameters: see `params.json` example file.
+Parameters: see `params.json` example file for all required paramters. Some relevant information:
 - `dt`: step size for Euler solver in ms. Standard: `1e-2`
 - `Tpres`: presentation time in ms. Standard: `1` 
-
 Relevant parameters for PAL:
 - `dtxi`: after how many ms to sample new noise. Standard: set to `dt`.
 - `tauxi`: time constant of Ornstein-Uhlenbeck noise. Standard: `10 * dt`
