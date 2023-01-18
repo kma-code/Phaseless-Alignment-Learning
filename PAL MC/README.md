@@ -34,7 +34,7 @@ Input signal:
 - Steps sampled from U[0,1] held for Tpres
 
 There are two ways to run the experiments:
-- open any of the Jupyter notebooks, where all steps are explained
+- check out the [Jupyter notebook](https://github.com/kma-code/Phaseless-Alignment-Learning/blob/master/PAL%20MC/PAL%20simple%20demo.ipynb), where all steps are explained
 - run the standalone python script by invoking `runner.py`. See below on usage.
 
 While I have implemented multiprocessing in the standalone script, everything still runs on numpy, so the experiments should be kept fairly small.
