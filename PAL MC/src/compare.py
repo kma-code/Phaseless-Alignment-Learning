@@ -92,7 +92,7 @@ def compare_updates(mc, model, params):
 
 		# mc.taueffP, mc.taueffP_notgt, mc.taueffI = mc.calc_taueff()
 
-		if mc.model == 'LDRL':
+		if mc.model == 'PAL':
 			# disable noise for PAL evaluation
 			mc.noise_scale = [0 for _ in mc.noise_scale]
 			mc.noise = [np.zeros_like(noise) for noise in mc.noise]

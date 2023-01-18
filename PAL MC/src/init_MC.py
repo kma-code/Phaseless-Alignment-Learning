@@ -131,7 +131,7 @@ def init_MC(params, seeds, teacher=False):
 					)
 				)
 
-		elif params["model_type"] in ["DTPDRL", "LDRL"]:
+		elif params["model_type"] in ["PAL"]:
 			noise_deg = params["noise_deg"] if "noise_deg" in params else None
 			taueps = params["taueps"] if "taueps" in params else None
 			tauxi = params["tauxi"] if "tauxi" in params else None
@@ -228,8 +228,8 @@ def init_MC(params, seeds, teacher=False):
 		MC_list[-1].rec_vbas=params["rec_vbas"]
 		if "rec_lat_mismatch" in params:
 			MC_list[-1].rec_lat_mismatch=params["rec_lat_mismatch"]
-		# some variables only exist in DTPDRL
-		if params["model_type"] in ["LDRL", "DTPDRL"]:
+		# some variables only exist in PAL
+		if params["model_type"] in ["PAL"]:
 			MC_list[-1].rec_rP_breve_HI=params["rec_rP_breve_HI"]
 			MC_list[-1].rec_vapi_noise=params["rec_vapi_noise"]
 			MC_list[-1].rec_noise=params["rec_noise"]
