@@ -226,6 +226,8 @@ def init_MC(params, seeds, teacher=False):
 		MC_list[-1].rec_rI_breve=params["rec_rI_breve"]
 		MC_list[-1].rec_vapi=params["rec_vapi"]
 		MC_list[-1].rec_vbas=params["rec_vbas"]
+		if "rec_lat_mismatch" in params:
+			MC_list[-1].rec_lat_mismatch=params["rec_lat_mismatch"]
 		# some variables only exist in DTPDRL
 		if params["model_type"] in ["LDRL", "DTPDRL"]:
 			MC_list[-1].rec_rP_breve_HI=params["rec_rP_breve_HI"]

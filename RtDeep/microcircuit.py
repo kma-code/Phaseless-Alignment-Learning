@@ -165,7 +165,7 @@ class base_model:
 		rec_WPP=False, rec_WIP=False, rec_BPP=False, rec_BPI=False,
 		rec_dWPP=False, rec_dWIP=False, rec_dBPP=False, rec_dBPI=False,
 		rec_uP=False, rec_uP_breve=False, rec_rP_breve=False, rec_rP_breve_HI=False, rec_uI=False, rec_uI_breve=False, rec_rI_breve=False,
-		rec_vbas=False, rec_vapi=False, rec_vapi_noise=False, rec_noise=False, rec_epsilon=False, rec_epsilon_LO=False):
+		rec_vbas=False, rec_vapi=False, rec_vapi_noise=False, rec_noise=False, rec_epsilon=False, rec_epsilon_LO=False, rec_lat_mismatch=False):
 		# records the values of the variables given in var_array
 		# e.g. WPP, BPP, uP_breve
 		# rec_per_steps sets after how many steps data is recorded
@@ -221,6 +221,8 @@ class base_model:
 			self.epsilon_time_series = []
 		if rec_epsilon_LO:
 			self.epsilon_LO_time_series = []
+		if rec_lat_mismatch:
+			self.lat_mismatch_time_series = []
 
 		self.rec_per_steps = rec_per_steps
 		self.rec_counter = 0
@@ -281,6 +283,11 @@ class base_model:
 			self.epsilon_time_series.append(copy.deepcopy(self.epsilon))
 		if hasattr(self, 'epsilon_LO_time_series'):
 			self.epsilon_LO_time_series.append(copy.deepcopy(self.epsilon_LO))
+		if hasattr(self, 'lat_mismatch_time_series'):
+			vbashat = [self.gbas / (self.gl + self.gbas + self.gapi) * vbas for vbas in self.vbas]
+			vbashat[-1] = (self.gl + self.gbas + self.gapi) / (self.gl + self.gbas) * vbashat[-1]
+			lat_mismatch = [uI_breve - vbashat for uI_breve, vbashat in zip(self.uI_breve, vbashat[1:])]
+			self.lat_mismatch_time_series.append(copy.deepcopy(lat_mismatch))
 
 
 	def calc_taueff(self):
