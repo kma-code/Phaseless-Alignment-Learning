@@ -33,7 +33,7 @@ Important: Run the single experiment before in order to download MNIST dataset.
 Then, use the simple runner script (modify parameters for sweep in `runner.py`):
 
 ```
-cd experiments/
+cd experiments/Fig5
 python runner.py --algorithm PAL --run
 python runner.py --algorithm PAL --linclass
 python runner.py --algorithm PAL --gather
