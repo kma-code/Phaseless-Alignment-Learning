@@ -21,6 +21,8 @@ Run MNIST autoencoder experiment:
 
 ## Instructions for reproducing MNIST autoencoder experiment with PAL (parameter sweep and linear classifier)
 
+This will run the experiment required for Fig. 5 in the manuscript. See paper and supplementary information for network parameters.
+
 Important: Run the single experiment before in order to download MNIST dataset.
 
 Then, use the simple runner script (modify parameters for sweep in `runner.py`):
@@ -32,6 +34,8 @@ python runner.py --algorithm PAL --linclass
 python runner.py --algorithm PAL --gather
 ```
 
-Instead of algorithms, choose from `BP, FA or PAL`.
+Instead of PAL algorithm, choose from `BP, FA or PAL`.
 
-- `--run` Will train the model, 
+- `--run` Will train the model, saving latent activation and model after every epoch.
+- `--linclass` Will load the model files and run a linear classifier on the test set.
+- `--gather` Will gather all results into a .npy file. Run linclass.ipynb to produce Fig. 5. 
