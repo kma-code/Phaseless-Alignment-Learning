@@ -1,7 +1,8 @@
 # Code repository for experiments with Phaseless Alignment Learning
 
 This repo contains experiments and links to other simulations implementing PAL.
-Paper "Learning efficient backprojections across cortical hierarchies in real time" available at https://arxiv.org/abs/2212.10249
+
+The paper "Learning efficient backprojections across cortical hierarchies in real time" is available at https://arxiv.org/abs/2212.10249
 
 Three separate setups were used for experiments:
 
@@ -9,4 +10,4 @@ Three separate setups were used for experiments:
 2) Figures 4c,d,e,f: Dendritic microcircuit simulator based on GeNN. LINK TO REPO (available shortly)
 3) Figure 5: Based on Generalized Latent Equilibrium codebase. LINK TO REPO (available shortly)
 
-In order to run an specific setup, please go to the corresponding repo.
+To run a specific setup, please go to the corresponding repo.

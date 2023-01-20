@@ -49,7 +49,7 @@ You can either make an experiment using the template:
 - change any parameter in `params.json`
 - run with `python runner.py --params run01/params.json --task bw_only` for bw weights only (no teacher)
    or with `python runner.py --params run01/params.json --task fw_bw` for fw and bw weight learning (with teacher)
-- if
+- if comparison plots with Backprop (e.g. angle between WPP^T and BPP) are required, add the flag `--compare BP`. This will run additional evaluations after the simulation. This can also be run after simulation by using `--load model.pkl`, see below. 
 - all plots are saved in `run01`, together with a `model.pkl` file of the microcircuit class objects after training
 
 Or use one of the files for the figures in the plot. Go through the above steps with one of the params.json files in the folder [experiments](https://github.com/kma-code/Phaseless-Alignment-Learning/tree/master/PAL%20MC/experiments).
