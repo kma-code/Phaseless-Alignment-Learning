@@ -1,0 +1,15 @@
+# math & plotting
+numpy
+matplotlib
+
+# learning
+sklearn
+scikit-learn
+
+# workflow
+sacred
+tqdm
+
+# torch
+torch
+torchvision
