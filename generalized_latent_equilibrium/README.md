@@ -14,6 +14,11 @@ source GLEnv/bin/activate
 Install requirements:
 `pip install -r requirements.txt`
 
+Set variable by adding to `~/.bashrc`:
+`export PYTHONPATH=$PYTHONPATH:/path-to-folder/.../generalized_latent_equilibrium/`
+
+Restart shell and activate environment again.
+
 ## Instructions for running a single MNIST autoencoder experiment with PAL
 
 Run MNIST autoencoder experiment:
