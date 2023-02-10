@@ -38,13 +38,13 @@ if __name__ == '__main__':
 	OUTPUT_DIR = PATH_runner / "runs"
 
 	# create a bunch of JSON param files in subfolders (lr/seeds/)
-	seeds = [1]#,5,7,9,11]
+	seeds = [1,5,7,9,11]
 
 	params_arr = []
-	for i in [-5]:#[-3, -2]:
-		for j in [-5]:#[-3, -2]:
-			for k in [-5]:#[-3, -2]:
-				for l in [-5]:#[-3, -2]:
+	for i in [-3, -2]:
+		for j in [-3, -2]:
+			for k in [-3, -2]:
+				for l in [-3, -2]:
 					params_per_lr = []
 					for seed in seeds:
 						params = {
