@@ -44,3 +44,5 @@ Instead of PAL algorithm, choose from `BP, FA or PAL`.
 - `--run` Will train the model, saving latent activation and model after every epoch.
 - `--linclass` Will load the model files and run a linear classifier on the test set.
 - `--gather` Will gather all results into a .npy file. Run linclass.ipynb to produce Fig. 5. 
+
+These runs will altogether take about 2h on a high-end GPU (tested on Tesla P100).
