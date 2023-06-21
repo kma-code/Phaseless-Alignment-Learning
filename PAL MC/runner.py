@@ -26,7 +26,7 @@ N_MAX_PROCESSES = 12 # defined by compute setup
 
 
 logging.basicConfig(format='Train model -- %(levelname)s: %(message)s',
-                    level=logging.INFO)
+					level=logging.INFO)
 
 def parse_experiment_arguments():
 	"""
@@ -88,17 +88,18 @@ def main(params, task='fw_bw', seeds=[667], load=None, compare_model=None):
 		logging.info(f'Model: {params["model_type"]}')
 		logging.info(f'Task: {task}')
 
-                if 'taur' in params:
-                    taur = params['taur']
-                    logging.info(f'Prospecivity will be modulated with taur: {taur}')
-                    # overwrite prospective_voltage function of model
-                    def _modulated_prospective_voltage(self, uvec, uvec_old, tau, dt=None):
-                        # returns an approximation of the lookahead of voltage vector u at current time
-                        if dt == None:
-                                dt = self.dt
-                        return uvec_old + taur * tau * (uvec - uvec_old) / dt
-                    for mc in MC_list:
-                        mc.prospective_voltage = types.MethodType(_modulated_prospective_voltage, mc)
+		if 'taur' in params:
+			import types
+			taur = params['taur']
+			logging.info(f'Prospecivity will be modulated with taur: {taur}')
+			# overwrite prospective_voltage function of model
+			def _modulated_prospective_voltage(self, uvec, uvec_old, tau, dt=None):
+				# returns an approximation of the lookahead of voltage vector u at current time
+				if dt == None:
+						dt = self.dt
+				return uvec_old + taur * tau * (uvec - uvec_old) / dt
+			for mc in MC_list:
+				mc.prospective_voltage = types.MethodType(_modulated_prospective_voltage, mc)
 
 
 		if task == 'fw_bw':

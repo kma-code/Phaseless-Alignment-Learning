@@ -303,7 +303,7 @@ class base_model:
 
 		taueffI = []
 		for i in self.uI:
-			taueffI.append([1 / (self.gl + self.gden + self.gnI)])
+			taueffI.append(1 / (self.gl + self.gden + self.gnI))
 
 		return taueffP, taueffP_notgt, taueffI
 
