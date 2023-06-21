@@ -10,9 +10,11 @@
     "tauLO": 1e+2,
     "tauxi": 1e-1,
 
+    "taur": 0.4,
+
     "_comment": "dataset_size: how many samples to present",
     "dataset_size": 100,
-    "epochs": 100,
+    "epochs": 2000,
     "_comment": "time (in ms) for pre-training to settle voltages",
     "settling_time": 100,
 
