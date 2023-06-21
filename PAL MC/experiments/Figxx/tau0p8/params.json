@@ -1,0 +1,126 @@
+{
+    "_comment": "GENERAL NOTE: optional arguments should be left in, as the runner does not check whether a param is required for a model and may cause an interrupt.",
+
+    "_comment": "all times below are in milliseconds",
+    "dt": 1e-2,
+    "Tpres": 1,
+    "_comment": "below only relevant for PAL",
+    "dtxi": 1e-2,
+    "tauHP": 1e-1,
+    "tauLO": 1e+2,
+    "tauxi": 1e-1,
+
+    "_comment": "dataset_size: how many samples to present",
+    "dataset_size": 100,
+    "epochs": 100,
+    "_comment": "time (in ms) for pre-training to settle voltages",
+    "settling_time": 100,
+
+    "layers": [5, 20, 10, 20, 5],
+
+    "_comment": "implemented activations: logistic, hard_sigmoid, relu, soft_relu, linear, tanh",
+    "activation": "logistic",
+
+    "_comment": "implemented models: BP, FA or PAL",
+    "model_type": "PAL",
+
+    "_comment": "PAL: noise type: white noise held or OU",
+    "noise_type": "OU",
+     "_comment": "PAL: sampled noise is rescaled by noise_scale",
+    "noise_scale": [5e-2, 5e-2, 5e-2],
+    "_comment": "PAL and uP_adaptive-only: noise_deg is the angle of alignment between uP_breve_i and BPP_iL * rP_breve_L below which no noise is injected",
+    "_comment": "                             i.e. we are satisfied with this amount of alignment",
+    "noise_deg": 30,
+    "_comment": "PAL: implemented modes: uP (scale noise with uP), vapi (scale noise with vapi) and uP_adaptive (scale noise with uP and angle of alignment)",
+    "noise_mode": "const",
+
+    "gl": 0.03,
+    "gbas": 0.1,
+    "gapi": 0.06,
+    "gden": 0.1,
+    "gnI": 0.06,
+    "gntgt": 0.06,
+
+    
+    "eta_fw": [1, 1, 1, 1],
+    "eta_bw": [50, 50, 50],
+    "eta_IP": [0, 0, 0],
+    "eta_PI": [5, 5, 5],
+
+    "_comment": "weights are initialised as numpy.random.uniform with range defined below. WIP and BPI are overridden by init_in_SPS=True",
+    "init_WPP_range": [-1, 1],
+    "init_WIP_range": [-1, 1],
+    "_comment": "FA and PAL only: range of BPP",
+    "init_BPP_range": [-1, 1],
+    "init_BPI_range": [-1, 1],
+
+    "init_teacher_WPP_range": [-1, 1],
+    "init_teacher_WIP_range": [-1, 1],
+    "_comment": "FA and PAL only: range of BPP",
+    "init_teacher_BPP_range": [-1, 1],
+    "init_teacher_BPI_range": [-1, 1],
+
+    "_comment": "PAL only: alpha is the scaling factor of the regularizer",
+    "alpha": [1e-5, 1e-5, 1e-5],
+
+    "_comment": "array of seeds",
+    "random_seed": [123, 456, 789, 111, 222, 1, 3, 5, 7, 9],
+
+    "_comment": "whether to set *the* self-predicting state during initialisation",
+    "init_in_SPS": true,
+
+    "_comment": "PAL only: low-pass on interneuron",
+    "inter_low_pass": false,
+    "_comment": "PAL only: high-pass on output layer pyramidal neurons",
+    "pyr_hi_pass": true,
+    "_comment": "PAL only: low-pass on updates of WPP",
+    "dWPP_low_pass": true,
+    "dWPP_r_low_pass": false,
+    "dWPP_post_low_pass": false,
+    "_comment": "PAL only: whether to apply regularizer only if rP_breve > 0",
+    "gate_regularizer": false,
+    "_comment": "whether to use activations in dWPP -- standard: true",
+    "dWPP_use_activation": true,
+
+    "_comment": "input signal, possibilites: step",
+    "input_signal": "step",
+
+    "_comment": "copy the weights and voltages of teacher at init (for testing)",
+    "copy_teacher_weights": false,
+    "copy_teacher_voltages": false,
+
+    "rec_per_steps": 1000,
+    "rec_MSE": true,
+    "rec_error": true,
+    "rec_input": true,
+    "rec_target": false,
+
+    "rec_WPP": true,
+    "rec_WIP": true,
+    "rec_BPP": true,
+    "rec_BPI": true,
+
+    "rec_dWPP": true,
+    "rec_dWIP": false,
+    "rec_dBPP": false,
+    "rec_dBPI": false,
+
+    "rec_uP": false,
+    "rec_uP_breve": false,
+    "rec_rP_breve": false,
+    "rec_rP_breve_HI": false,
+    "rec_uI": false,
+    "rec_uI_breve": false,
+    "rec_rI_breve": false,
+
+    "rec_vbas": true,
+    "rec_vapi": false,
+    "rec_vapi_noise": false,
+    "rec_noise": false,
+    "rec_epsilon": false,
+    "rec_epsilon_LO": false,
+    "rec_lat_mismatch": false
+
+}
+
+
