@@ -3,18 +3,16 @@
 
     "_comment": "all times below are in milliseconds",
     "dt": 1e-2,
-    "Tpres": 1,
+    "Tpres": 10,
     "_comment": "below only relevant for PAL",
     "dtxi": 1e-2,
-    "tauHP": 1e-1,
-    "tauLO": 1e+2,
-    "tauxi": 1e-1,
-
-    "taur": 0.0,
+    "tauHP": 1e+0,
+    "tauLO": 1e+3,
+    "tauxi": 1e+0,
 
     "_comment": "dataset_size: how many samples to present",
     "dataset_size": 100,
-    "epochs": 2000,
+    "epochs": 100,
     "_comment": "time (in ms) for pre-training to settle voltages",
     "settling_time": 100,
 
@@ -44,10 +42,10 @@
     "gntgt": 0.06,
 
     
-    "eta_fw": [1, 1, 1, 1],
-    "eta_bw": [50, 50, 50],
+    "eta_fw": [0.1, 0.1, 0.1, 0.1],
+    "eta_bw": [5, 5, 5],
     "eta_IP": [0, 0, 0],
-    "eta_PI": [5, 5, 5],
+    "eta_PI": [0.5, 0.5, 0.5],
 
     "_comment": "weights are initialised as numpy.random.uniform with range defined below. WIP and BPI are overridden by init_in_SPS=True",
     "init_WPP_range": [-1, 1],
@@ -91,18 +89,18 @@
     "copy_teacher_weights": false,
     "copy_teacher_voltages": false,
 
-    "rec_per_steps": 1000,
-    "rec_MSE": true,
-    "rec_error": true,
-    "rec_input": true,
+    "rec_per_steps": 10000,
+    "rec_MSE": false,
+    "rec_error": false,
+    "rec_input": false,
     "rec_target": false,
 
     "rec_WPP": true,
-    "rec_WIP": true,
+    "rec_WIP": false,
     "rec_BPP": true,
-    "rec_BPI": true,
+    "rec_BPI": false,
 
-    "rec_dWPP": true,
+    "rec_dWPP": false,
     "rec_dWIP": false,
     "rec_dBPP": false,
     "rec_dBPI": false,
