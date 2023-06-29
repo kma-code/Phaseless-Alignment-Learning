@@ -2,6 +2,9 @@
 
 This folder contains all files to reproduce several experiments with dendritic cortical microcircuits.
 
+Install requirements:
+`pip install -r requirements.txt`
+
 ## Using the standalone `runner.py`
 
 You can either make an experiment using the template:
