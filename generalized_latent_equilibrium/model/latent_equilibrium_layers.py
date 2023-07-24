@@ -858,7 +858,7 @@ class LESequential(object):
                 l.tau_HP = self.tau_HP[i]
                 l.tau_LO = self.tau_LO[i]
                 l.sigma = self.sigma[i]
-            l.wn_sigma = self.wn_sigma[i]
+                l.wn_sigma = self.wn_sigma[i]
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.loss_fn = loss_fn

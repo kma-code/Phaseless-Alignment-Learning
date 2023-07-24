@@ -29,7 +29,7 @@ if __name__ == '__main__':
 	logging.info(f'Algorithm: {algo}')
 
 	# path to parent generalized_latent_equilbrium folder
-	PATH_parent = Path(__file__).parent.resolve().parents[1]
+	PATH_parent = Path(__file__).parent.resolve().parents[2]
 	# path to folder of this file
 	PATH_runner = Path(__file__).parent.resolve() / str(algo)
 
