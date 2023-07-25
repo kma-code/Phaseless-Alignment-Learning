@@ -104,7 +104,7 @@ def validate_model(model, val_loader):
     total_cnt = 0
     val_accuracies = []
     model.eval()
-    for batch_idx, (x, target) in tqdm(enumerate(val_loader)):
+    for batch_idx, (x, target) in enumerate(val_loader):
         if use_cuda:
             x, target = x.cuda(), target.cuda()
         x = x.view(-1, 32 * 32 * 3)
