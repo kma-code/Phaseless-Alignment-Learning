@@ -195,6 +195,7 @@ if __name__ == '__main__':
     parser.add_argument('--load', default=None, type=str, help='Saved network to load.')
     parser.add_argument('--params', default=None, type=str, help='Load parameters from file (overrides manual params).')
     parser.add_argument('--wn_sigma', default=[0,0,0.3,0.3], help="Stdev of white noise injected into each layer")
+    parser.add_argument('--target_type', default="softmax", help="Function used to inject error at output layer (default: softmax)")
     # additional params for PAL
     parser.add_argument('--bw_lr_factors', default=[1e-2,1e-2,1e-2,1e-2], help="Learning rate multipliers for backwards weights originating from each layer")
     parser.add_argument('--regularizer', default=[1e-4,1e-4,1e-4,1e-4], help="Size of weight decay regularizer")
@@ -220,7 +221,7 @@ if __name__ == '__main__':
         lr_factors = PARAMETERS["lr_factors"]
         algorithm = PARAMETERS["algorithm"]
         model_variant = PARAMETERS["model_variant"]
-        target_type = TargetType.RATE
+        target_type = PARAMETERS["target_type"]
         presentation_steps = PARAMETERS["n_updates"]
         epochs = PARAMETERS["epochs"]
         tqdm_disabled = True
@@ -257,7 +258,7 @@ if __name__ == '__main__':
         lr_factors = args.lr_factors
         algorithm = args.algorithm
         model_variant = args.model_variant
-        target_type = TargetType.RATE
+        target_type = args.target_type
         presentation_steps = args.n_updates
         epochs = args.epochs
         with_optimizer = args.with_optimizer
@@ -277,7 +278,7 @@ if __name__ == '__main__':
 
     with_optimizer = False
 
-    logging.info(f"Params: Epochs {epochs}, batch_size {batch_size}, lr_multiplier {lr_multiplier}, lr_factors {lr_factors}, white noise {wn_sigma}, algorithm {algorithm}")
+    logging.info(f"Params: Epochs {epochs}, batch_size {batch_size}, lr_multiplier {lr_multiplier}, lr_factors {lr_factors}, white noise {wn_sigma}, algorithm {algorithm}, target_type {target_type}")
     # if algorithm == "PAL":
     #     logging.info(f"Params: bw_lr_factors {bw_lr_factors}, regularizer {regularizer}, tau_xi {tau_xi}, tau_HP {tau_HP}, tau_LO {tau_LO}, sigma {sigma}")
 

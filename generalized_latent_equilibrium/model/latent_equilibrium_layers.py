@@ -1021,6 +1021,9 @@ class LESequential(object):
         # and use rate difference as target
         if self.target_type == TargetType.RATE:
             e_trg = rho_deriv * (target - rho)
+        # or use softmax
+        if self.target_type == 'softmax':
+            e_trg = target - F.softmax(voltage_lookaheads, dim=-1)
         # or use voltage difference as target
         else:
             e_trg = (target - voltage_lookaheads)
