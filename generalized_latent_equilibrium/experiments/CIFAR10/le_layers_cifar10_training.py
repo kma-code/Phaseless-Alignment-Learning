@@ -391,6 +391,7 @@ if __name__ == '__main__':
         # evaluate model on test set
         logging.info("Evaluating model before training (val+test)")
 
+        logging.info(f"Target type: {model.target_type}")
         val, weights_arr, bw_weights_arr = validate_model(model, val_loader)
         val_acc.append(val)
         if weights_arr is not None:

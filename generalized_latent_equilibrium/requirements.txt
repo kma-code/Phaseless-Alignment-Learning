@@ -3,7 +3,6 @@ numpy
 matplotlib
 
 # learning
-sklearn
 scikit-learn
 
 # workflow
