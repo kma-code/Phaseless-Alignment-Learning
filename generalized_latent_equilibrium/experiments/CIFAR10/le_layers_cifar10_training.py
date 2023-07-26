@@ -97,7 +97,6 @@ def MLPNet(batch_size, lr_multiplier, lr_factors, tau=10.0, dt=0.1, beta=0.1, al
 
     return network
 
-
 def validate_model(model, val_loader):
 
     correct_cnt, summed_loss = 0, 0
