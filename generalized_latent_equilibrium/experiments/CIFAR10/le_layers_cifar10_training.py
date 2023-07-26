@@ -138,7 +138,7 @@ def validate_model(model, val_loader):
     elif model.algorithm == 'BP':
         bw_weights_arr = [layer.weights.t().detach().cpu().numpy() for layer in model.layers] if rec_weights else None
 
-    return correct_cnt/total_cnt, weights_arr, bw_weights_arr
+    return (correct_cnt/total_cnt).detach().cpu().numpy(), weights_arr, bw_weights_arr
 
 
 def test_model(model, test_loader):
@@ -454,7 +454,7 @@ if __name__ == '__main__':
 
             # plot val loss
             ax = plt.figure(figsize=(7,5))
-            plt.plot(val_acc.detach().cpu().numpy())
+            plt.plot(val_acc)
             IMG_NAME = PATH_OUTPUT + "val_acc.png"
             logging.info(f"Saving plot of validation loss to {IMG_NAME}")
             plt.savefig(IMG_NAME)

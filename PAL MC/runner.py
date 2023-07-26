@@ -147,13 +147,13 @@ def main(params, task='fw_bw', seeds=[667], load=None, compare_model=None):
 
 		N_PROCESSES = len(MC_list) if N_MAX_PROCESSES > len(MC_list) else N_MAX_PROCESSES
 
-		if task == 'bw_only':
-			# generate comparison with BP weight updates
-			partial_run = functools.partial(compare.compare_updates, model=compare_model, params=params)
-			with mp.Pool(N_PROCESSES) as pool:
-				MC_list = pool.map(partial_run, MC_list)
-				pool.close()
-			# MC_list = compare.compare_updates(MC_list=MC_list, model=compare_model, params=params)
+		#if task == 'bw_only':
+		#	# generate comparison with BP weight updates
+		#	partial_run = functools.partial(compare.compare_updates, model=compare_model, params=params)
+		#	with mp.Pool(N_PROCESSES) as pool:
+		#		MC_list = pool.map(partial_run, MC_list)
+		#		pool.close()
+		#	# MC_list = compare.compare_updates(MC_list=MC_list, model=compare_model, params=params)
 		
 		# create angle between WPP.T and BPP
 		MC_list = compare.compare_weight_matrices(MC_list=MC_list, model=compare_model)
@@ -162,12 +162,12 @@ def main(params, task='fw_bw', seeds=[667], load=None, compare_model=None):
 		# create angle between BPP and phi' WPP.T phi'
 		MC_list = compare.compare_BPP_RHS(MC_list=MC_list, model=compare_model)
 
-	logging.info(f'Plotting results')
-	# plot.
-	if task == 'fw_bw':
-		plot_exp.plot(MC_list, MC_teacher, path=PATH)
-	else:
-		plot_exp.plot(MC_list, path=PATH)
+	#logging.info(f'Plotting results')
+	## plot.
+	#if task == 'fw_bw':
+	#	plot_exp.plot(MC_list, MC_teacher, path=PATH)
+	#else:
+	#	plot_exp.plot(MC_list, path=PATH)
 
 	logging.info(f'Saving results')
 	if task == 'fw_bw':
