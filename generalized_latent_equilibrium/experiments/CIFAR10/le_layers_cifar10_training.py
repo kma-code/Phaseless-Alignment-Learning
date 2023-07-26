@@ -76,7 +76,7 @@ def MLPNet(batch_size, lr_multiplier, lr_factors, tau=10.0, dt=0.1, beta=0.1, al
 
     if algorithm == 'PAL':
         fc1 = nn.Linear_PAL(32 * 32 * 3, 1024, act_func, algorithm=algorithm)
-        fc2 = nn.Linear_PAL(1024, 1024, tu.Linear, algorithm=algorithm)
+        fc2 = nn.Linear_PAL(1024, 1024, act_func, algorithm=algorithm)
         fc3 = nn.Linear_PAL(1024, 1024, act_func, algorithm=algorithm)
         fc4 = nn.Linear_PAL(1024, 10, tu.Linear, algorithm=algorithm)
 
@@ -89,7 +89,7 @@ def MLPNet(batch_size, lr_multiplier, lr_factors, tau=10.0, dt=0.1, beta=0.1, al
 
     else:
         fc1 = nn.Linear(32 * 32 * 3, 1024, act_func, algorithm=algorithm)
-        fc2 = nn.Linear(1024, 1024, tu.Linear, algorithm=algorithm)
+        fc2 = nn.Linear(1024, 1024, act_func, algorithm=algorithm)
         fc3 = nn.Linear(1024, 1024, act_func, algorithm=algorithm)
         fc4 = nn.Linear(1024, 10, tu.Linear, algorithm=algorithm)
         network = nn.LESequential([fc1, fc2, fc3, fc4], learning_rate, lr_factors, None, None,
