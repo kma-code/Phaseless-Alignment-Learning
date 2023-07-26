@@ -454,7 +454,7 @@ if __name__ == '__main__':
 
             # plot val loss
             ax = plt.figure(figsize=(7,5))
-            plt.plot(val_acc)
+            plt.plot(val_acc.detach().cpu().numpy())
             IMG_NAME = PATH_OUTPUT + "val_acc.png"
             logging.info(f"Saving plot of validation loss to {IMG_NAME}")
             plt.savefig(IMG_NAME)
