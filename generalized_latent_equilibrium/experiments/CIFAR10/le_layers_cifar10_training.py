@@ -159,14 +159,14 @@ def validate_model(model, val_loader):
 
     val_accuracies.append((correct_cnt / total_cnt).cpu().numpy())
 
-    # record weights
-    weights_arr = [layer.weights.detach().cpu().numpy() for layer in model.layers] if rec_weights else None
-    if model.algorithm in ["FA", "PAL"]:
-        bw_weights_arr = [layer.bw_weights.detach().cpu().numpy() for layer in model.layers] if rec_weights else None
-    elif model.algorithm == 'BP':
-        bw_weights_arr = [layer.weights.t().detach().cpu().numpy() for layer in model.layers] if rec_weights else None
+    # # record weights
+    # weights_arr = [layer.weights.detach().cpu().numpy() for layer in model.layers] if rec_weights else None
+    # if model.algorithm in ["FA", "PAL"]:
+    #     bw_weights_arr = [layer.bw_weights.detach().cpu().numpy() for layer in model.layers] if rec_weights else None
+    # elif model.algorithm == 'BP':
+    #     bw_weights_arr = [layer.weights.t().detach().cpu().numpy() for layer in model.layers] if rec_weights else None
 
-    return (correct_cnt/total_cnt).detach().cpu().numpy(), weights_arr, bw_weights_arr
+    return (correct_cnt/total_cnt).detach().cpu().numpy()#, weights_arr, bw_weights_arr
 
 
 def test_model(model, test_loader):
@@ -423,12 +423,13 @@ if __name__ == '__main__':
         logging.info("Evaluating model before training (val+test)")
 
         logging.info(f"Target type: {model.target_type}")
-        val, weights_arr, bw_weights_arr = validate_model(model, val_loader)
+        #val, weights_arr, bw_weights_arr = validate_model(model, val_loader)
+        val = validate_model(model, val_loader)
         val_acc.append(val)
-        if weights_arr is not None:
-            weights_time_series.append(weights_arr)
-        if bw_weights_arr is not None:
-            bw_weights_time_series.append(bw_weights_arr)   
+        # if weights_arr is not None:
+        #     weights_time_series.append(weights_arr)
+        # if bw_weights_arr is not None:
+        #     bw_weights_time_series.append(bw_weights_arr)   
 
         test_model(model, test_loader)
 
@@ -467,12 +468,13 @@ if __name__ == '__main__':
                     logging.info(f'Epoch: {epoch+1}, batch index: {batch_idx + 1}, train loss: {(np.abs(summed_loss).sum(1)/total_cnt).mean(0):.9f}')
 
             # validate
-            val, weights_arr, bw_weights_arr = validate_model(model, val_loader)
+            #val, weights_arr, bw_weights_arr = validate_model(model, val_loader)
+            val = validate_model(model, val_loader)
             val_acc.append(val)
-            if weights_arr is not None:
-                weights_time_series.append(weights_arr)
-            if bw_weights_arr is not None:
-                bw_weights_time_series.append(bw_weights_arr)   
+            # if weights_arr is not None:
+            #     weights_time_series.append(weights_arr)
+            # if bw_weights_arr is not None:
+            #     bw_weights_time_series.append(bw_weights_arr)   
 
             ## after every epoch, save model
             #
