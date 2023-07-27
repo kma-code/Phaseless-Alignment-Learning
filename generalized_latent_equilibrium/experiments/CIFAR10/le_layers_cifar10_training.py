@@ -71,7 +71,9 @@ def LeNet5(batch_size, lr_multiplier, lr_factors, tau=10.0, dt=0.1, beta=0.1, al
     """
     learning_rate = 0.125 * lr_multiplier / presentation_steps / dt
 
-    act_func = tu.HardSigmoid
+    #act_func = tu.HardSigmoid
+    act_func = tu.TanH
+    logging.info(f'Initializing net with activation function {act_func}')
 
     # to do: implement for PAL
     if algorithm == 'PAL':
