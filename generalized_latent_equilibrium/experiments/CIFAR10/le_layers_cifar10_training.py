@@ -62,6 +62,33 @@ def deg(cos):
 
 # networks
 
+def LeNet5(batch_size, lr_multiplier, lr_factors, tau=10.0, dt=0.1, beta=0.1, algorithm='BP',
+           model_variant=ModelVariant.VANILLA, target_type=TargetType.RATE, presentation_steps=10, with_optimizer=False,
+           bw_lr_factors=None, regularizer=None, tau_xi=None, tau_HP=None, tau_LO=None, sigma=None, wn_sigma=[0,0,0,0]):
+    """
+    - 2 Convs with max pooling and relu
+    - 2 Fully connected layers and relu
+    """
+    learning_rate = 0.125 * lr_multiplier / presentation_steps / dt
+
+    act_func = tu.HardSigmoid
+
+    # to do: implement for PAL
+    if algorithm == 'PAL':
+        raise NotImplemented('PAL not yet implemented')
+    else:
+        l1 = nn.Conv2d(3, 20, 5, batch_size, 32, act_func)
+        l2 = nn.MaxPool2d(2)
+        l3 = nn.Conv2d(20, 50, 5, batch_size, 14, act_func)
+        l4 = nn.MaxPool2d(2)
+        l5 = nn.Projection((batch_size, 50, 5, 5), 500, act_func)
+        l6 = nn.Linear(500, 10, tu.Linear, algorithm=algorithm)
+
+        network = nn.LESequential([l1, l2, l3, l4, l5, l6], learning_rate, lr_factors, None, None,
+                                  tau, dt, beta, model_variant, target_type, with_optimizer=with_optimizer, algorithm=algorithm, sigma=sigma, wn_sigma=wn_sigma)
+
+    return network
+
 def MLPNet(batch_size, lr_multiplier, lr_factors, tau=10.0, dt=0.1, beta=0.1, algorithm='BP',
            model_variant=ModelVariant.VANILLA, target_type=TargetType.RATE, presentation_steps=10, with_optimizer=False,
            bw_lr_factors=None, regularizer=None, tau_xi=None, tau_HP=None, tau_LO=None, sigma=None, wn_sigma=[0,0,0,0]):
@@ -106,7 +133,7 @@ def validate_model(model, val_loader):
     for batch_idx, (x, target) in enumerate(val_loader):
         if use_cuda:
             x, target = x.cuda(), target.cuda()
-        x = x.view(-1, 32 * 32 * 3)
+        # x = x.view(-1, 32 * 32 * 3)
 
         for update_i in range(presentation_steps):
             model.update(x, target)
@@ -154,8 +181,8 @@ def test_model(model, test_loader):
     model.eval()
 
     for batch_idx, (x, target) in enumerate(test_loader):
-        # we need to flatten images
-        x = x.view(-1, 32 * 32 * 3)
+        # # we need to flatten images
+        # x = x.view(-1, 32 * 32 * 3)
         if use_cuda:
             x, target = x.cuda(), target.cuda()
 
@@ -186,14 +213,14 @@ if __name__ == '__main__':
     parser.add_argument('--model_variant', default="vanilla", type=str, help="Model variant: vanilla, full_forward_pass")
     parser.add_argument('--batch_size', default=32, type=int, help="Batch size for training")
     parser.add_argument('--batch_learning_multiplier', default=64, type=int, help="Learning rate multiplier for batch learning")
-    parser.add_argument('--lr_factors', default=[1e-3,1e-3,1e-3,1e-3], help="Learning rate multipliers for each layer")
+    parser.add_argument('--lr_factors', default=[1.0, 0.2, 0.2, 0.2, 0.2, 0.1], help="Learning rate multipliers for each layer")
     parser.add_argument('--n_updates', default=10, type=int, help="Number of update steps per sample/batch (presentation time in time steps dt)")
     parser.add_argument('--with_optimizer', action='store_true', help="Train network with Adam Optimizer")
     parser.add_argument('--epochs', default=10, type=int, help='Number of epochs to train.')
     parser.add_argument('--seed', default=7, type=int, help='Seed for reproducibility.')
     parser.add_argument('--load', default=None, type=str, help='Saved network to load.')
     parser.add_argument('--params', default=None, type=str, help='Load parameters from file (overrides manual params).')
-    parser.add_argument('--wn_sigma', default=[0,0,0.3,0.3], help="Stdev of white noise injected into each layer")
+    parser.add_argument('--wn_sigma', default=[0,0,0,0,0,0], help="Stdev of white noise injected into each layer")
     parser.add_argument('--target_type', default="softmax", help="Function used to inject error at output layer (default: softmax)")
     # additional params for PAL
     parser.add_argument('--bw_lr_factors', default=[1e-2,1e-2,1e-2,1e-2], help="Learning rate multipliers for backwards weights originating from each layer")
@@ -366,11 +393,13 @@ if __name__ == '__main__':
         # training
 
         if algorithm == 'PAL':
-            model = MLPNet(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer,
+            # model = MLPNet(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer,
+            #                bw_lr_factors = bw_lr_factors, regularizer = regularizer, tau_xi = tau_xi, tau_HP = tau_HP, tau_LO = tau_LO, sigma = sigma, wn_sigma = wn_sigma)
+            model = LeNet5(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer,
                            bw_lr_factors = bw_lr_factors, regularizer = regularizer, tau_xi = tau_xi, tau_HP = tau_HP, tau_LO = tau_LO, sigma = sigma, wn_sigma = wn_sigma)
         else:
-            model = MLPNet(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer, wn_sigma=wn_sigma)
-        
+            #model = MLPNet(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer, wn_sigma=wn_sigma)
+            model = LeNet5(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer, wn_sigma=wn_sigma)
         model.epoch = 0
 
         # optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
@@ -419,7 +448,7 @@ if __name__ == '__main__':
                 # optimizer.zero_grad()
                 if use_cuda:
                     x, target = x.cuda(), target.cuda()
-                x = x.view(-1, 32 * 32 * 3)
+                # x = x.view(-1, 32 * 32 * 3)
 
                 for update_i in range(presentation_steps):
                     model.update(x, target)
