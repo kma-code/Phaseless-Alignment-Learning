@@ -384,10 +384,10 @@ if __name__ == '__main__':
             logging.info(f"{PATH_OUTPUT} doesn't exists, creating")
             os.makedirs(PATH_OUTPUT)
 
-        # save model at init
-        with open(PATH_OUTPUT + 'MLPNet_epoch0.pkl', 'wb') as output:
-                    pickle.dump(model, output, pickle.HIGHEST_PROTOCOL)
-                    logging.info(f'Saved model to {output.name}')
+        ## save model at init
+        #with open(PATH_OUTPUT + 'MLPNet_epoch0.pkl', 'wb') as output:
+        #            pickle.dump(model, output, pickle.HIGHEST_PROTOCOL)
+        #            logging.info(f'Saved model to {output.name}')
         # evaluate model on test set
         logging.info("Evaluating model before training (val+test)")
 
@@ -443,11 +443,11 @@ if __name__ == '__main__':
             if bw_weights_arr is not None:
                 bw_weights_time_series.append(bw_weights_arr)   
 
-            # after every epoch, save model
-
-            with open(PATH_OUTPUT + 'MLPNet_epoch' + str(epoch+1) + '.pkl', 'wb') as output:
-                pickle.dump(model, output, pickle.HIGHEST_PROTOCOL)
-                logging.info(f'Saved model to {output.name}')
+            ## after every epoch, save model
+            #
+            #with open(PATH_OUTPUT + 'MLPNet_epoch' + str(epoch+1) + '.pkl', 'wb') as output:
+            #    pickle.dump(model, output, pickle.HIGHEST_PROTOCOL)
+            #    logging.info(f'Saved model to {output.name}')
 
         with open(PATH_OUTPUT + "val_acc.pkl", "wb") as output:
             pickle.dump(val_acc, output)
