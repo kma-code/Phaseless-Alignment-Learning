@@ -175,7 +175,17 @@ def validate_model(model, val_loader):
     # elif model.algorithm == 'BP':
     #     bw_weights_arr = [layer.weights.t().detach().cpu().numpy() for layer in model.layers] if rec_weights else None
 
-    return (correct_cnt/total_cnt).detach().cpu().numpy()#, weights_arr, bw_weights_arr
+    # record angle between weights
+    if model.algorithm in ["FA", "PAL"] and rec_degs:
+        for layer in model.layers:
+            if hasattr(layer, 'weights'):
+                W = layer.weights.detach().cpu().numpy()
+                B = layer.bw_weights.detach().cpu().numpy()
+                deg_WTB = deg(cos_sim(W.T, B))
+    else:
+        deg_WTB = None
+
+    return (correct_cnt/total_cnt).detach().cpu().numpy(), deg_WTB
 
 
 def test_model(model, test_loader):
@@ -241,7 +251,7 @@ if __name__ == '__main__':
     parser.add_argument('--tau_LO', default=[1e+4,1e+4,1e+4,1e+4,1e+4,1e+4], help="Time constant of low-pass filter in forward weights (given in time steps dt)")
     parser.add_argument('--sigma', default=[1e-2,1e-2,1e-2,1e-2,1e-2,0], help="Stdev of Ornstein-Uhlenbeck noise injected into each layer")
     # recording of params
-    parser.add_argument('--rec_weights', default=False, action='store_true', help="Record all weights of net")
+    parser.add_argument('--rec_degs', default=False, action='store_true', help="Record angle between W.T and B")
     parser.add_argument('--rec_activations', default=False, action='store_true', help="Record activations after every presentation time")
     parser.add_argument('--rec_noise', default=False, action='store_true', help="Record injected noise (PAL only)")
 
@@ -264,10 +274,10 @@ if __name__ == '__main__':
         tqdm_disabled = True
         PATH_OUTPUT = PARAMETERS["output"]
 
-        if "rec_weights" in PARAMETERS:
-            rec_weights = PARAMETERS["rec_weights"]
+        if "rec_degs" in PARAMETERS:
+            rec_degs = PARAMETERS["rec_degs"]
         else:
-            rec_weights = False
+            rec_degs = False
         if "rec_activations" in PARAMETERS:
             rec_activations = PARAMETERS["rec_activations"]
         else:
@@ -309,7 +319,7 @@ if __name__ == '__main__':
         sigma = args.sigma
         wn_sigma = args.wn_sigma
 
-        rec_weights = args.rec_weights
+        rec_degs = args.rec_degs
         rec_activations = args.rec_activations
         rec_noise = args.rec_noise
 
@@ -378,12 +388,12 @@ if __name__ == '__main__':
     logging.info(f'Total validation batches: {len(val_loader)}')
     logging.info(f'Total testing batches: {len(test_loader)}')
 
-    if rec_weights:
-        logging.info(f'Recording weights after every evaluation: {rec_weights}')
+    if rec_degs:
+        logging.info(f'Recording angle of weights after every evaluation: {rec_degs}')
         weights_time_series = []
         bw_weights_time_series = []
     if rec_activations or rec_noise:
-        logging.info(f'Recording during evaluation after every presentation time: Weights: {rec_weights}, Activations: {rec_activations}, Noise: {rec_noise}')
+        logging.info(f'Recording during evaluation after every presentation time: Angle (W.T,B): {rec_degs}, Activations: {rec_activations}, Noise: {rec_noise}')
 
 
     # if a model file has been passed, load and do not train
@@ -418,6 +428,7 @@ if __name__ == '__main__':
         # criterion = nn.CrossEntropyLoss()
 
         val_acc = []
+        deg_arr = []
 
         # create output directory if it doesn't exist
         if not(os.path.exists(PATH_OUTPUT)):
@@ -433,8 +444,10 @@ if __name__ == '__main__':
 
         logging.info(f"Target type: {model.target_type}")
         #val, weights_arr, bw_weights_arr = validate_model(model, val_loader)
-        val = validate_model(model, val_loader)
+        val, deg_WTB = validate_model(model, val_loader)
         val_acc.append(val)
+        if rec_degs and deg_arr is not None:
+            deg_arr.append(deg_WTB)
         # if weights_arr is not None:
         #     weights_time_series.append(weights_arr)
         # if bw_weights_arr is not None:
@@ -502,37 +515,40 @@ if __name__ == '__main__':
             logging.info(f"Saving plot of validation loss to {IMG_NAME}")
             plt.savefig(IMG_NAME)
 
-        if rec_weights:
-
-            # generate plot of angle between B and W.T
-            deg_time_series = []
-
-            for weights, bw_weights in zip(weights_time_series, bw_weights_time_series):
-                # for every recorded time step, calculate cos_sim
-                # leave out first entry of weights, as it is not used to transport errors
-                deg_time_series.append([deg(cos_sim(W.T,B)) for W, B in zip(weights[1:], bw_weights[1:])])
-
-            ax = plt.figure(figsize=(7,5))
-            lines = plt.plot(deg_time_series)
-            labels = ['layer ' + str(i+1) for i in range(len(model.layers))]
-            plt.legend(lines, labels)
-            plt.xlabel('Epochs')
-            plt.ylabel('alignment [deg]')
-            # plt.legend()
-            IMG_NAME = PATH_OUTPUT + "deg_time_series.png"
-            logging.info(f"Saving plot of angle between W.T and B to {IMG_NAME}")
-            plt.savefig(IMG_NAME)
-
-            # save weights
-            with open(PATH_OUTPUT + "weights.pkl", "wb") as output:
-                pickle.dump(weights_time_series, output)
-                logging.info(f"Saving weights to {output.name}")
-            with open(PATH_OUTPUT + "bw_weights.pkl", "wb") as output:
-                pickle.dump(bw_weights_time_series, output)
-                logging.info(f"Saving backwards weights to {output.name}")
-            with open(PATH_OUTPUT + "deg_time_series.pkl", "wb") as output:
-                pickle.dump(deg_time_series, output)
+        if rec_degs:
+            with open(PATH_OUTPUT + "deg_arr.pkl", "wb") as output:
+                pickle.dump(deg_arr, output)
                 logging.info(f"Saving angle between W.T and B to {output.name}")
+
+            # # generate plot of angle between B and W.T
+            # deg_time_series = []
+
+            # for weights, bw_weights in zip(weights_time_series, bw_weights_time_series):
+            #     # for every recorded time step, calculate cos_sim
+            #     # leave out first entry of weights, as it is not used to transport errors
+            #     deg_time_series.append([deg(cos_sim(W.T,B)) for W, B in zip(weights[1:], bw_weights[1:])])
+
+            # ax = plt.figure(figsize=(7,5))
+            # lines = plt.plot(deg_time_series)
+            # labels = ['layer ' + str(i+1) for i in range(len(model.layers))]
+            # plt.legend(lines, labels)
+            # plt.xlabel('Epochs')
+            # plt.ylabel('alignment [deg]')
+            # # plt.legend()
+            # IMG_NAME = PATH_OUTPUT + "deg_time_series.png"
+            # logging.info(f"Saving plot of angle between W.T and B to {IMG_NAME}")
+            # plt.savefig(IMG_NAME)
+
+            # # save weights
+            # with open(PATH_OUTPUT + "weights.pkl", "wb") as output:
+            #     pickle.dump(weights_time_series, output)
+            #     logging.info(f"Saving weights to {output.name}")
+            # with open(PATH_OUTPUT + "bw_weights.pkl", "wb") as output:
+            #     pickle.dump(bw_weights_time_series, output)
+            # #     logging.info(f"Saving backwards weights to {output.name}")
+            # with open(PATH_OUTPUT + "deg_time_series.pkl", "wb") as output:
+            #     pickle.dump(deg_time_series, output)
+            #     logging.info(f"Saving angle between W.T and B to {output.name}")
 
 
     
