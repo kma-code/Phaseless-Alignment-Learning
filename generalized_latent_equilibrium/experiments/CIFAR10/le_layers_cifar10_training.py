@@ -72,12 +72,21 @@ def LeNet5(batch_size, lr_multiplier, lr_factors, tau=10.0, dt=0.1, beta=0.1, al
     learning_rate = 0.125 * lr_multiplier / presentation_steps / dt
 
     #act_func = tu.HardSigmoid
+    logging.info(f"Initializing network using {algorithm}")
     act_func = tu.TanH
     logging.info(f'Initializing net with activation function {act_func}')
 
-    # to do: implement for PAL
     if algorithm == 'PAL':
-        raise NotImplemented('PAL not yet implemented')
+        l1 = nn.Conv2d_PAL(3, 20, 5, batch_size, 32, act_func, algorithm=algorithm)
+        l2 = nn.MaxPool2d(2)
+        l3 = nn.Conv2d_PAL(20, 50, 5, batch_size, 14, act_func, algorithm=algorithm)
+        l4 = nn.MaxPool2d(2)
+        l5 = nn.Projection_PAL((batch_size, 50, 5, 5), 500, act_func, algorithm=algorithm)
+        l6 = nn.Linear_PAL(500, 10, tu.Linear, algorithm=algorithm)
+
+        network = nn.LESequential([l1, l2, l3, l4, l5, l6], learning_rate, lr_factors, None, None,
+                                  tau, dt, beta, model_variant, target_type, with_optimizer=with_optimizer, algorithm=algorithm,
+                                  bw_lr_factors=bw_lr_factors, regularizer=regularizer, tau_xi=tau_xi, tau_HP=tau_HP, tau_LO=tau_LO, sigma=sigma, wn_sigma=wn_sigma)
     else:
         l1 = nn.Conv2d(3, 20, 5, batch_size, 32, act_func, algorithm=algorithm)
         l2 = nn.MaxPool2d(2)
@@ -225,12 +234,12 @@ if __name__ == '__main__':
     parser.add_argument('--wn_sigma', default=[0,0,0,0,0,0], help="Stdev of white noise injected into each layer")
     parser.add_argument('--target_type', default="softmax", help="Function used to inject error at output layer (default: softmax)")
     # additional params for PAL
-    parser.add_argument('--bw_lr_factors', default=[1e-2,1e-2,1e-2,1e-2], help="Learning rate multipliers for backwards weights originating from each layer")
-    parser.add_argument('--regularizer', default=[1e-4,1e-4,1e-4,1e-4], help="Size of weight decay regularizer")
-    parser.add_argument('--tau_xi', default=[10,10,10,10], help="Filter constant of Ornstein-Uhlenbeck noise (given in time steps dt)")
-    parser.add_argument('--tau_HP', default=[10,10,10,10], help="Time constant of high-pass filter (given in time steps dt)")
-    parser.add_argument('--tau_LO', default=[1e+4,1e+4,1e+4,1e+4], help="Time constant of low-pass filter in forward weights (given in time steps dt)")
-    parser.add_argument('--sigma', default=[1e-2,1e-2,1e-2,0], help="Stdev of Ornstein-Uhlenbeck noise injected into each layer")
+    parser.add_argument('--bw_lr_factors', default=[1e-2,1e-2,1e-2,1e-2,1e-2,1e-2], help="Learning rate multipliers for backwards weights originating from each layer")
+    parser.add_argument('--regularizer', default=[1e-4,1e-4,1e-4,1e-4,1e-4,1e-4], help="Size of weight decay regularizer")
+    parser.add_argument('--tau_xi', default=[10,10,10,10,10,10], help="Filter constant of Ornstein-Uhlenbeck noise (given in time steps dt)")
+    parser.add_argument('--tau_HP', default=[10,10,10,10,10,10], help="Time constant of high-pass filter (given in time steps dt)")
+    parser.add_argument('--tau_LO', default=[1e+4,1e+4,1e+4,1e+4,1e+4,1e+4], help="Time constant of low-pass filter in forward weights (given in time steps dt)")
+    parser.add_argument('--sigma', default=[1e-2,1e-2,1e-2,1e-2,1e-2,0], help="Stdev of Ornstein-Uhlenbeck noise injected into each layer")
     # recording of params
     parser.add_argument('--rec_weights', default=False, action='store_true', help="Record all weights of net")
     parser.add_argument('--rec_activations', default=False, action='store_true', help="Record activations after every presentation time")
