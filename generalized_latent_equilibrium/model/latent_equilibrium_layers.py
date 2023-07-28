@@ -24,7 +24,7 @@ def dataloader_seed_worker(worker_id):
 
 
 class Conv2d(object):
-    def __init__(self, num_channels, num_filters, kernel_size, batch_size, input_size, act_function, padding=0, stride=1, learning_rate=0.1):
+    def __init__(self, num_channels, num_filters, kernel_size, batch_size, input_size, act_function, padding=0, stride=1, learning_rate=0.1, algorithm='BP', wn_sigma=0):
         self.input_size = input_size
         self.num_channels = num_channels
         self.num_filters = num_filters
@@ -45,8 +45,14 @@ class Conv2d(object):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.train_W = True
 
+        self.algorithm = algorithm
+        self.wn_sigma = wn_sigma
+
         self.kernel = torch.empty(self.num_filters, self.num_channels, self.kernel_size, self.kernel_size).normal_(mean=0, std=0.05).to(self.device)
         self.biases = torch.empty(self.num_filters).normal_(mean=0, std=0.05).to(self.device)
+        if self.algorithm == 'FA':
+            self.bw_weights = torch.empty([self.input_size, self.target_size]).T.normal_(mean=0.0, std=0.05).to(self.device)
+            self.bw_weights_flat = self.kernel.reshape(self.num_filters, -1)
 
         self.unfold = nn.Unfold(kernel_size=(self.kernel_size, self.kernel_size),
                                 padding=self.padding,
@@ -107,7 +113,7 @@ class Conv2d(object):
         self.basal_inputs = self.weights_flat @ self.rho_flat
         self.basal_inputs = self.basal_inputs.reshape(self.batch_size, self.num_filters, self.target_size, self.target_size) + self.biases.reshape(1, -1, 1, 1)
 
-        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + self.errors)
+        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + self.errors + self.wn_sigma * torch.randn(self.voltages.size(), device=self.device))
         self.voltage_lookaheads = self.voltages + self.tau * self.voltages_deriv
         self.voltages = self.voltages + self.dt * self.voltages_deriv
 
@@ -181,7 +187,10 @@ class Conv2d(object):
         """
         # e
         e = (voltage_lookaheads - basal_inputs).reshape(self.batch_size, self.num_filters, -1)
-        err = self.weights_flat.T @ e
+        if self.algorithm == 'BP':
+            err = self.weights_flat.T @ e
+        elif self.algorithm =='FA':
+            err = self.bw_weights_flat.T @ e
         err = self.fold(err)
         err = rho_deriv * err
         return err
@@ -286,7 +295,7 @@ class AvgPool2d(object):
 
 
 class Projection(object):
-    def __init__(self, input_size, target_size, act_function, dtype=torch.float32):
+    def __init__(self, input_size, target_size, act_function, dtype=torch.float32, algorithm='BP'):
         self.input_size = input_size
         self.B, self.C, self.H, self.W = self.input_size
         self.target_size = target_size
@@ -298,12 +307,16 @@ class Projection(object):
         self.learning_rate_W = 0
         self.learning_rate_biases = 0
 
+        self.algorithm = algorithm
+
         self.dtype = dtype
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.train_W = True
 
         self.Hid = self.C * self.H * self.W
         self.weights = torch.empty((self.Hid, self.target_size)).normal_(mean=0.0, std=0.05).to(self.device)
+        if self.algorithm == 'FA':
+            self.bw_weights = torch.empty([self.Hid, self.target_size]).T.normal_(mean=0.0, std=0.05).to(self.device)
         self.biases = torch.empty(self.target_size).normal_(mean=0.0, std=0.05).to(self.device)
 
         self.voltages = torch.zeros([1, self.target_size], device=self.device)
@@ -426,7 +439,10 @@ class Projection(object):
 
         """
         # e
-        err = torch.matmul(voltage_lookaheads - basal_inputs, self.weights.t())
+        if self.algorithm == 'BP':
+            err = torch.matmul(voltage_lookaheads - basal_inputs, self.weights.t())
+        elif self.algorithm == 'FA':
+            err = torch.matmul(voltage_lookaheads - basal_inputs, self.bw_weights)
         err = err.reshape((len(err), self.C, self.H, self.W))
         err = rho_deriv * err
         return err

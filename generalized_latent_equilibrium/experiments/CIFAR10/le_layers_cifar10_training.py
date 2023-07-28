@@ -79,11 +79,11 @@ def LeNet5(batch_size, lr_multiplier, lr_factors, tau=10.0, dt=0.1, beta=0.1, al
     if algorithm == 'PAL':
         raise NotImplemented('PAL not yet implemented')
     else:
-        l1 = nn.Conv2d(3, 20, 5, batch_size, 32, act_func)
+        l1 = nn.Conv2d(3, 20, 5, batch_size, 32, act_func, algorithm=algorithm)
         l2 = nn.MaxPool2d(2)
-        l3 = nn.Conv2d(20, 50, 5, batch_size, 14, act_func)
+        l3 = nn.Conv2d(20, 50, 5, batch_size, 14, act_func, algorithm=algorithm)
         l4 = nn.MaxPool2d(2)
-        l5 = nn.Projection((batch_size, 50, 5, 5), 500, act_func)
+        l5 = nn.Projection((batch_size, 50, 5, 5), 500, act_func, algorithm=algorithm)
         l6 = nn.Linear(500, 10, tu.Linear, algorithm=algorithm)
 
         network = nn.LESequential([l1, l2, l3, l4, l5, l6], learning_rate, lr_factors, None, None,
