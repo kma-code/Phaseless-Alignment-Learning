@@ -1402,7 +1402,7 @@ class LESequential(object):
     def _update_errors(self, target_error):
         self.errors[-1] = target_error
         for i, layer in reversed(list(enumerate(self.layers))):
-            print(f'Udpating error in layer {i}')
+            # print(f'Udpating error in layer {i}')
             self.errors[i] = layer.update_weights(self.errors[i + 1], self.with_optimizer)
 
     def _update_bw_weights(self):

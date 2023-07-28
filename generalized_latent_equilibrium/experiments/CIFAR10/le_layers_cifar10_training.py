@@ -524,6 +524,15 @@ if __name__ == '__main__':
                 pickle.dump(deg_arr, output)
                 logging.info(f"Saving angle between W.T and B to {output.name}")
 
+            ax = plt.figure(figsize=(7,5))
+            plt.plot(deg_arr)
+            plt.xlabel('Epochs')
+            plt.ylabel('alignment [deg]')
+            # plt.legend()
+            IMG_NAME = PATH_OUTPUT + "deg_WTB.png"
+            logging.info(f"Saving plot of angle between W.T and B to {IMG_NAME}")
+            plt.savefig(IMG_NAME)
+
             # # generate plot of angle between B and W.T
             # deg_time_series = []
 
