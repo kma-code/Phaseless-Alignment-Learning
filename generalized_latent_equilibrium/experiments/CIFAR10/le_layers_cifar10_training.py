@@ -444,7 +444,7 @@ if __name__ == '__main__':
         logging.info("Evaluating model before training (val+test)")
 
         logging.info(f"Target type: {model.target_type}")
-        #val, weights_arr, bw_weights_arr = validate_model(model, val_loader)
+        # val, weights_arr, bw_weights_arr = validate_model(model, val_loader)
         val, deg_WTB = validate_model(model, val_loader)
         val_acc.append(val)
         if rec_degs and deg_arr is not None:
@@ -493,7 +493,10 @@ if __name__ == '__main__':
             # validate
             #val, weights_arr, bw_weights_arr = validate_model(model, val_loader)
             val = validate_model(model, val_loader)
+            val, deg_WTB = validate_model(model, val_loader)
             val_acc.append(val)
+            if rec_degs and deg_arr is not None:
+                deg_arr.append(deg_WTB)
             # if weights_arr is not None:
             #     weights_time_series.append(weights_arr)
             # if bw_weights_arr is not None:
