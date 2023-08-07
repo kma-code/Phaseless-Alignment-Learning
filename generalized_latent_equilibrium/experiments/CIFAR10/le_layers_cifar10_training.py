@@ -243,7 +243,7 @@ if __name__ == '__main__':
     parser.add_argument('--load', default=None, type=str, help='Saved network to load.')
     parser.add_argument('--params', default=None, type=str, help='Load parameters from file (overrides manual params).')
     parser.add_argument('--wn_sigma', default=[0,0,0,0,0,0], help="Stdev of white noise injected into each layer")
-    parser.add_argument('--target_type', default="softmax", help="Function used to inject error at output layer (default: softmax)")
+    parser.add_argument('--target_type', default="mse", help="Function used to inject error at output layer (default: mse)")
     # additional params for PAL
     parser.add_argument('--bw_lr_factors', default=[1e-2,1e-2,1e-2,1e-2,1e-2,1e-2], help="Learning rate multipliers for backwards weights originating from each layer")
     parser.add_argument('--regularizer', default=[1e-4,1e-4,1e-4,1e-4,1e-4,1e-4], help="Size of weight decay regularizer")
