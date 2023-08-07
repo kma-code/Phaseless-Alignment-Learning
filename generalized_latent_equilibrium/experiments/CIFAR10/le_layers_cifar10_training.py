@@ -183,7 +183,7 @@ def validate_model(model, val_loader):
                 W = layer.weights.detach().cpu().numpy()
                 B = layer.bw_weights.detach().cpu().numpy()
                 deg_WTB.append(deg(cos_sim(W.T, B)))
-                logging.info(f'Angle in layer {layer}: {deg_WTB}')
+                logging.info(f'Angle in layer {layer}: {deg_WTB[-1]}')
     else:
         deg_WTB = None
 
