@@ -177,11 +177,12 @@ def validate_model(model, val_loader):
 
     # record angle between weights
     if model.algorithm in ["FA", "PAL"] and rec_degs:
+        deg_WTB = []
         for layer in model.layers:
             if hasattr(layer, 'weights'):
                 W = layer.weights.detach().cpu().numpy()
                 B = layer.bw_weights.detach().cpu().numpy()
-                deg_WTB = deg(cos_sim(W.T, B))
+                deg_WTB.append(deg(cos_sim(W.T, B)))
                 logging.info(f'Angle in layer {layer}: {deg_WTB}')
     else:
         deg_WTB = None
