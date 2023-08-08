@@ -78,9 +78,9 @@ def LeNet5(batch_size, lr_multiplier, lr_factors, tau=10.0, dt=0.1, beta=0.1, al
 
     if algorithm == 'PAL':
         l1 = nn.Conv2d_PAL(3, 20, 5, batch_size, 32, act_func, algorithm=algorithm)
-        l2 = nn.MaxPool2d(2)
+        l2 = nn.MaxPool2d(2, algorithm=algorithm)
         l3 = nn.Conv2d_PAL(20, 50, 5, batch_size, 14, act_func, algorithm=algorithm)
-        l4 = nn.MaxPool2d(2)
+        l4 = nn.MaxPool2d(2, algorithm=algorithm)
         l5 = nn.Projection_PAL((batch_size, 50, 5, 5), 500, act_func, algorithm=algorithm)
         l6 = nn.Linear_PAL(500, 10, tu.Linear, algorithm=algorithm)
 
@@ -89,9 +89,9 @@ def LeNet5(batch_size, lr_multiplier, lr_factors, tau=10.0, dt=0.1, beta=0.1, al
                                   bw_lr_factors=bw_lr_factors, regularizer=regularizer, tau_xi=tau_xi, tau_HP=tau_HP, tau_LO=tau_LO, sigma=sigma, wn_sigma=wn_sigma)
     else:
         l1 = nn.Conv2d(3, 20, 5, batch_size, 32, act_func, algorithm=algorithm)
-        l2 = nn.MaxPool2d(2)
+        l2 = nn.MaxPool2d(2, algorithm=algorithm)
         l3 = nn.Conv2d(20, 50, 5, batch_size, 14, act_func, algorithm=algorithm)
-        l4 = nn.MaxPool2d(2)
+        l4 = nn.MaxPool2d(2, algorithm=algorithm)
         l5 = nn.Projection((batch_size, 50, 5, 5), 500, act_func, algorithm=algorithm)
         l6 = nn.Linear(500, 10, tu.Linear, algorithm=algorithm)
 
@@ -445,12 +445,12 @@ if __name__ == '__main__':
         logging.info("Evaluating model before training (val+test)")
 
         logging.info(f"Target type: {model.target_type}")
-        val, deg_WTB = validate_model(model, val_loader)
-        val_acc.append(val)
-        if rec_degs and deg_arr is not None:
-            deg_arr.append(deg_WTB)
+        # val, deg_WTB = validate_model(model, val_loader)
+        # val_acc.append(val)
+        # if rec_degs and deg_arr is not None:
+        #     deg_arr.append(deg_WTB)
 
-        test_model(model, test_loader)
+        # test_model(model, test_loader)
 
         logging.basicConfig(format='Train model -- %(levelname)s: %(message)s',
                     level=logging.INFO, force=True)

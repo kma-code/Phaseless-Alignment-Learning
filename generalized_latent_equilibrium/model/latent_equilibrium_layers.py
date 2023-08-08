@@ -51,8 +51,7 @@ class Conv2d(object):
         self.kernel = torch.empty(self.num_filters, self.num_channels, self.kernel_size, self.kernel_size).normal_(mean=0, std=0.05).to(self.device)
         self.biases = torch.empty(self.num_filters).normal_(mean=0, std=0.05).to(self.device)
         if self.algorithm == 'FA':
-            self.bw_weights = torch.empty([self.input_size, self.target_size]).T.normal_(mean=0.0, std=0.05).to(self.device)
-            self.bw_weights_flat = self.kernel.reshape(self.num_filters, -1)
+            self.bw_weights = self.kernel.reshape(self.num_filters, -1)
 
         self.unfold = nn.Unfold(kernel_size=(self.kernel_size, self.kernel_size),
                                 padding=self.padding,
@@ -190,7 +189,7 @@ class Conv2d(object):
         if self.algorithm == 'BP':
             err = self.weights_flat.T @ e
         elif self.algorithm =='FA':
-            err = self.bw_weights_flat.T @ e
+            err = self.bw_weights.T @ e
         err = self.fold(err)
         err = rho_deriv * err
         return err
@@ -236,8 +235,7 @@ class Conv2d_PAL(Conv2d):
 
         self.sigma = sigma      # scale of injected noise
 
-        self.bw_weights = torch.empty([self.input_size, self.target_size]).T.normal_(mean=0.0, std=0.05).to(self.device)
-        self.bw_weights_flat = self.kernel.reshape(self.num_filters, -1)
+        self.bw_weights = self.kernel.reshape(self.num_filters, -1)
         self.noise = torch.zeros([1, self.num_filters, self.target_size, self.target_size], device=self.device)
         self.rho_HP = torch.zeros([1, self.num_filters, self.target_size, self.target_size], device=self.device)
         self.Delta_rho = torch.zeros([1, self.num_filters, self.target_size, self.target_size], device=self.device)
@@ -259,6 +257,7 @@ class Conv2d_PAL(Conv2d):
         self.train_B = False
 
     def forward(self, rho, rho_deriv):
+        print("testing rho:", rho.size())
         self.rho_input = rho.clone()
         self.rho_flat = self.unfold(rho.clone())
         self.weights_flat = self.kernel.reshape(self.num_filters, -1)
@@ -290,6 +289,9 @@ class Conv2d_PAL(Conv2d):
 
         self.errors = self._calculate_errors(self.voltage_lookaheads, rho_deriv, self.basal_inputs)
 
+        print("rho_HP in fw:", self.rho_HP.mean())
+        print("noise in fw:", self.noise.mean())
+
         return self.rho, self.rho_deriv, self.rho_HP, self.noise
 
     def _calculate_errors(self, voltage_lookaheads, rho_deriv, basal_inputs):
@@ -308,7 +310,7 @@ class Conv2d_PAL(Conv2d):
         """
         # e
         e = (voltage_lookaheads - basal_inputs).reshape(self.batch_size, self.num_filters, -1)
-        err = self.bw_weights_flat.T @ e
+        err = self.bw_weights.T @ e
         err = self.fold(err)
         err = rho_deriv * err
         return err
@@ -373,6 +375,26 @@ class Conv2d_PAL(Conv2d):
 
         return self.rho_HP
 
+    def get_bw_weight_derivatives(self, rho_HP, noise):
+        """
+        Return weight derivative calculated from current rate and errors.
+        Args:
+
+        Returns:
+            weight_derivative: noise * r_HP^T
+
+        """
+        print(f"rho_HP in get_bw_weight_derivatives: {rho_HP.mean()}, {rho_HP.size()}")
+        print(f"noise in get_bw_weight_derivatives: {noise.mean() if noise is not None else noise}, {noise.size()}")
+        print("bw_weights:", self.bw_weights.size())
+        rho_HP_flat = rho_HP.reshape(self.batch_size, self.num_filters, -1)
+        noise_flat = self.unfold(noise.clone())
+        print(f"rho_HP_flat {rho_HP_flat.size()}")
+        print(f"noise_flat {noise_flat.size()}")
+        print(f"einsum {(torch.einsum('bif,bjf->bfij', rho_HP_flat, noise_flat)).mean(0).mean(0).size()}")
+        return (torch.einsum('bif,bjf->bfij', rho_HP_flat, noise_flat)).mean(0).mean(0) - self.regularizer * self.bw_weights
+
+
     def update_bw_weights(self, rho_HP, noise, with_optimizer=False):
 
         if self.train_B:
@@ -386,10 +408,29 @@ class Conv2d_PAL(Conv2d):
 
 class MaxPool2d(object):
     # These are not really neurons...
-    def __init__(self, kernel_size):
+    def __init__(self, kernel_size, dtype=torch.float32, algorithm='BP'):
         self.kernel_size = kernel_size
         self.target_size = kernel_size
-        self.algorithm = None
+        self.algorithm = algorithm
+
+        self.PASS_LAYER = True
+
+        self.dtype = dtype
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+        self.voltages = torch.zeros([1, self.target_size], device=self.device)
+        self.voltages_deriv = None
+        self.voltage_lookaheads = torch.zeros([1, self.target_size], device=self.device)
+        self.errors = torch.zeros([1, self.target_size], device=self.device)
+
+        self.rho = None
+        self.rho_input = None
+        self.rho_deriv = torch.zeros([1, self.target_size], dtype=dtype, device=self.device)
+        if self.algorithm == 'PAL':
+            self.noise = torch.zeros([1, self.target_size], device=self.device)
+            self.rho_HP = torch.zeros([1, self.target_size], device=self.device)
+            self.Delta_rho = torch.zeros([1, self.target_size], device=self.device)
+
 
     def train(self):
         """
@@ -405,10 +446,54 @@ class MaxPool2d(object):
         """
         pass
 
-    def forward(self, rho, rho_deriv):
+    def _adapt_parallel_network_qty(self):
+        """Adapt number of voltage sets to batch size (if more sets are required, repeat current sets, if less are required drop current sets).
+        Returns:
+
+        """
+        batch_size = self.rho_input.shape[0]
+        if len(self.voltages.shape) != 2 or self.voltages.shape[0] != batch_size:
+            voltage_size = self.voltages.shape[0]
+            repeats = int(batch_size / voltage_size)
+            remainder = batch_size % voltage_size
+            repetition_vector = torch.tensor([repeats], device=self.device).repeat(voltage_size)
+            repetition_vector[-1] = repetition_vector[-1] + remainder
+
+            self.voltages = torch.repeat_interleave(self.voltages, repetition_vector, dim=0).clone()
+            self.errors = torch.repeat_interleave(self.errors, repetition_vector, dim=0).clone()
+            self.voltage_lookaheads = torch.repeat_interleave(self.voltage_lookaheads, repetition_vector, dim=0).clone()
+
+            if self.algorithm == 'PAL':
+                self.noise = torch.repeat_interleave(self.noise, repetition_vector, dim=0).clone()
+                self.rho_HP = torch.repeat_interleave(self.rho_HP, repetition_vector, dim=0).clone()
+                self.Delta_rho = torch.repeat_interleave(self.Delta_rho, repetition_vector, dim=0).clone()
+
+    def forward(self, rho, rho_deriv, rho_HP=None, noise=None):
+        self.rho_input = rho.clone()
+        print("size of rho in maxpool2d fw:", rho.size())
+
+        self._adapt_parallel_network_qty()
+
         rho_out, self.idxs_rho = F.max_pool2d(rho, self.kernel_size, return_indices=True)
         rho_deriv_out = self._maxpool2d_with_indices(rho_deriv, self.idxs_rho)
-        return rho_out, rho_deriv_out
+
+        # noise is taken from layer below
+        if noise is not None:
+            noise_out = self._maxpool2d_with_indices(noise, self.idxs_rho)
+        # rho_HP comes from layer above
+        # due to ordering of calcualtions, this could be none even for PAL
+        # at first evaluation
+        if rho_HP is not None:
+            rho_HP_out = F.max_unpool2d(rho_HP, self.idxs_rho, self.kernel_size)
+        else:
+            rho_HP_out = torch.zeros_like(rho_out)
+
+        if self.algorithm in ['BP', 'FA']:
+            return rho_out, rho_deriv_out
+        elif self.algorithm == 'PAL':
+            return rho_out, rho_deriv_out, rho_HP_out, noise_out
+        else:
+            raise NotImplemented("Algorithm not implemented")
 
     def _maxpool2d_with_indices(self, t, indices):
         flattened_tensor = t.flatten(start_dim=2)
@@ -424,8 +509,8 @@ class MaxPool2d(object):
     def load_layer(self, logdir, i):
         pass
 
-    def __call__(self, rho, rho_deriv):
-        return self.forward(rho, rho_deriv)
+    def __call__(self, rho, rho_deriv, rho_HP=None, noise=None):
+        return self.forward(rho, rho_deriv, rho_HP, noise)
 
     def parameters(self):
         return []
@@ -474,6 +559,7 @@ class Projection(object):
     def __init__(self, input_size, target_size, act_function, dtype=torch.float32, algorithm='BP'):
         self.input_size = input_size
         self.B, self.C, self.H, self.W = self.input_size
+        self.batch_size = self.B
         self.target_size = target_size
         self.act_function = act_function.f
         self.act_func_deriv = act_function.df
@@ -652,7 +738,7 @@ class Projection_PAL(Projection):
 
 
         if self.algorithm != 'PAL':
-            raise Exception("Unknown algorithm: this linear layer is only implemented for PAL")
+            raise Exception("Unknown algorithm: this projection layer is only implemented for PAL")
 
         self.train_B = True
 
@@ -808,24 +894,7 @@ class Projection_PAL(Projection):
                 self.bw_weights -= self.bw_weights.grad * self.learning_rate_B
 
 
-
-    # ### CALCULATE WEIGHT DERIVATIVES ### #
-
-    def get_weight_derivatives(self):
-        """
-        Return weight derivative calculated from current rate and errors.
-        Args:
-
-        Returns:
-            weight_derivative: e * r^T * η
-
-        """
-        # If the input is served as a single sample, it is not in batch form, but this here requires it.
-        if len(self.rho_input.shape) == 1:
-            self.rho_input = self.rho_input.unsqueeze(0)
-        return (torch.einsum('bi,bj->bij', self.rho_input, self.errors)).mean(0)
-
-    # ### CALCULATE WEIGHT DERIVATIVES ### #
+    # ### CALCULATE BW WEIGHT DERIVATIVES ### #
 
     def get_bw_weight_derivatives(self, rho_HP, noise):
         """
@@ -836,8 +905,10 @@ class Projection_PAL(Projection):
             weight_derivative: noise * r_HP^T
 
         """
-
-        return (torch.einsum('bi,bj->bij', rho_HP, noise)).mean(0) - self.regularizer * self.bw_weights
+        print(f"rho_HP in get_bw_weight_derivatives: {rho_HP.mean()}, {rho_HP.size()}")
+        print(f"noise in get_bw_weight_derivatives: {noise.mean() if noise is not None else noise}, {noise.reshape(self.batch_size, self.Hid).size()}")
+        print("bw_weights:", self.bw_weights.size())
+        return (torch.einsum('bi,bj->bij', rho_HP, noise.reshape(self.batch_size, self.Hid))).mean(0) - self.regularizer * self.bw_weights
 
     def get_PAL_parameters(self):
         param_dict = {"learning_rate_bw": self.learning_rate_B,
@@ -1369,7 +1440,20 @@ class LESequential(object):
                 for i, layer in enumerate(self.layers):
                     if self.algorithm == 'PAL' and layer.algorithm == 'PAL':
                         #print('Updating PAL layer', i, '...', end='')
-                        new_rhos[i + 1], new_rho_derivs[i + 1], new_rho_HPs[i + 1], new_noises[i] = layer(self.rho[i], self.rho_deriv[i])
+                        print('---------------------------')
+                        print(f'PAL layer {layer}')
+                        # print(f"dims: {self.rho[i].size()}, {self.rho_deriv[i].size()}, {self.rho_HP[i+2].size()}, {self.noise[i-1].size()}")
+                        if hasattr(layer, 'PASS_LAYER'):
+                            if layer.PASS_LAYER:
+                                # layers with PASS_LAYER instantaneously transport noise upwards
+                                # and rho_HP downwards
+                                new_rhos[i + 1], new_rho_derivs[i + 1], new_rho_HPs[i + 1], new_noises[i] = layer(self.rho[i], self.rho_deriv[i], rho_HP=new_rho_HPs[i + 2], noise=new_noises[i - 1])
+                                # print(self.noise[i-1])
+                                # print(new_noises[i])
+                        else:
+                            new_rhos[i + 1], new_rho_derivs[i + 1], new_rho_HPs[i + 1], new_noises[i] = layer(self.rho[i], self.rho_deriv[i])
+
+                        print(f"out dims: {new_rhos[i + 1].size()}, {new_rho_derivs[i + 1].size()}, {new_rho_HPs[i + 1].size()}, {new_noises[i].size()}")
                     else:
                         #print('Updating regular layer', i, '...', end='')
                         new_rhos[i + 1], new_rho_derivs[i + 1] = layer(self.rho[i], self.rho_deriv[i])  # in principle W * r + b
@@ -1378,8 +1462,8 @@ class LESequential(object):
                         self.rho[i + 1] = torch.zeros_like(new_rhos[i + 1])
                         self.rho_deriv[i + 1] = torch.zeros_like(new_rho_derivs[i + 1])
                         if self.algorithm == 'PAL' and layer.algorithm == 'PAL':
-                            self.rho_HP[i + 1] = torch.zeros_like(new_rho_HPs[i + 1])
-                    #print('... Update done')
+                            self.rho_HP[i + 1] = torch.zeros_like(new_rhos[i + 1])
+                    # print('... Update done')
 
                 self.rho = new_rhos
                 self.rho_deriv = new_rho_derivs
@@ -1406,9 +1490,15 @@ class LESequential(object):
             self.errors[i] = layer.update_weights(self.errors[i + 1], self.with_optimizer)
 
     def _update_bw_weights(self):
+        print('---------------------------')
+        print('---------------------------')
+        print("self.noise before updating:", [noise.mean() if noise is not None else noise for noise in self.noise])
+        print("bw layers to update:", [hasattr(layer, 'bw_weights') for i, layer in list(enumerate(self.layers))[1:]])
         if self.algorithm == 'PAL':
             for i, layer in list(enumerate(self.layers))[1:]:
                 if hasattr(layer, 'bw_weights'):
+                    print('---------------------------')
+                    print(f"updating layer {layer}")
                     layer.update_bw_weights(self.rho_HP[i + 1], self.noise[i - 1], self.with_optimizer)
 
     def get_errors(self):
