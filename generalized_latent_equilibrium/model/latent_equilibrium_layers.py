@@ -257,7 +257,7 @@ class Conv2d_PAL(Conv2d):
         self.train_B = False
 
     def forward(self, rho, rho_deriv):
-        print("testing rho:", rho.size())
+        # print("testing rho:", rho.size())
         self.rho_input = rho.clone()
         self.rho_flat = self.unfold(rho.clone())
         self.weights_flat = self.kernel.reshape(self.num_filters, -1)
@@ -289,8 +289,8 @@ class Conv2d_PAL(Conv2d):
 
         self.errors = self._calculate_errors(self.voltage_lookaheads, rho_deriv, self.basal_inputs)
 
-        print("rho_HP in fw:", self.rho_HP.mean())
-        print("noise in fw:", self.noise.mean())
+        # print("rho_HP in fw:", self.rho_HP.mean())
+        # print("noise in fw:", self.noise.mean())
 
         return self.rho, self.rho_deriv, self.rho_HP, self.noise
 
@@ -384,14 +384,14 @@ class Conv2d_PAL(Conv2d):
             weight_derivative: noise * r_HP^T
 
         """
-        print(f"rho_HP in get_bw_weight_derivatives: {rho_HP.mean()}, {rho_HP.size()}")
-        print(f"noise in get_bw_weight_derivatives: {noise.mean() if noise is not None else noise}, {noise.size()}")
-        print("bw_weights:", self.bw_weights.size())
+        # print(f"rho_HP in get_bw_weight_derivatives: {rho_HP.mean()}, {rho_HP.size()}")
+        # print(f"noise in get_bw_weight_derivatives: {noise.mean() if noise is not None else noise}, {noise.size()}")
+        # print("bw_weights:", self.bw_weights.size())
         rho_HP_flat = rho_HP.reshape(self.batch_size, self.num_filters, -1)
         noise_flat = self.unfold(noise.clone())
-        print(f"rho_HP_flat {rho_HP_flat.size()}")
-        print(f"noise_flat {noise_flat.size()}")
-        print(f"einsum {(torch.einsum('bif,bjf->bfij', rho_HP_flat, noise_flat)).mean(0).mean(0).size()}")
+        # print(f"rho_HP_flat {rho_HP_flat.size()}")
+        # print(f"noise_flat {noise_flat.size()}")
+        # print(f"einsum {(torch.einsum('bif,bjf->bfij', rho_HP_flat, noise_flat)).mean(0).mean(0).size()}")
         return (torch.einsum('bif,bjf->bfij', rho_HP_flat, noise_flat)).mean(0).mean(0) - self.regularizer * self.bw_weights
 
 
@@ -470,7 +470,7 @@ class MaxPool2d(object):
 
     def forward(self, rho, rho_deriv, rho_HP=None, noise=None):
         self.rho_input = rho.clone()
-        print("size of rho in maxpool2d fw:", rho.size())
+        # print("size of rho in maxpool2d fw:", rho.size())
 
         self._adapt_parallel_network_qty()
 
@@ -905,9 +905,9 @@ class Projection_PAL(Projection):
             weight_derivative: noise * r_HP^T
 
         """
-        print(f"rho_HP in get_bw_weight_derivatives: {rho_HP.mean()}, {rho_HP.size()}")
-        print(f"noise in get_bw_weight_derivatives: {noise.mean() if noise is not None else noise}, {noise.reshape(self.batch_size, self.Hid).size()}")
-        print("bw_weights:", self.bw_weights.size())
+        # print(f"rho_HP in get_bw_weight_derivatives: {rho_HP.mean()}, {rho_HP.size()}")
+        # print(f"noise in get_bw_weight_derivatives: {noise.mean() if noise is not None else noise}, {noise.reshape(self.batch_size, self.Hid).size()}")
+        # print("bw_weights:", self.bw_weights.size())
         return (torch.einsum('bi,bj->bij', rho_HP, noise.reshape(self.batch_size, self.Hid))).mean(0) - self.regularizer * self.bw_weights
 
     def get_PAL_parameters(self):
@@ -1440,8 +1440,8 @@ class LESequential(object):
                 for i, layer in enumerate(self.layers):
                     if self.algorithm == 'PAL' and layer.algorithm == 'PAL':
                         #print('Updating PAL layer', i, '...', end='')
-                        print('---------------------------')
-                        print(f'PAL layer {layer}')
+                        # print('---------------------------')
+                        # print(f'PAL layer {layer}')
                         # print(f"dims: {self.rho[i].size()}, {self.rho_deriv[i].size()}, {self.rho_HP[i+2].size()}, {self.noise[i-1].size()}")
                         if hasattr(layer, 'PASS_LAYER'):
                             if layer.PASS_LAYER:
@@ -1453,7 +1453,7 @@ class LESequential(object):
                         else:
                             new_rhos[i + 1], new_rho_derivs[i + 1], new_rho_HPs[i + 1], new_noises[i] = layer(self.rho[i], self.rho_deriv[i])
 
-                        print(f"out dims: {new_rhos[i + 1].size()}, {new_rho_derivs[i + 1].size()}, {new_rho_HPs[i + 1].size()}, {new_noises[i].size()}")
+                        # print(f"out dims: {new_rhos[i + 1].size()}, {new_rho_derivs[i + 1].size()}, {new_rho_HPs[i + 1].size()}, {new_noises[i].size()}")
                     else:
                         #print('Updating regular layer', i, '...', end='')
                         new_rhos[i + 1], new_rho_derivs[i + 1] = layer(self.rho[i], self.rho_deriv[i])  # in principle W * r + b
@@ -1490,15 +1490,15 @@ class LESequential(object):
             self.errors[i] = layer.update_weights(self.errors[i + 1], self.with_optimizer)
 
     def _update_bw_weights(self):
-        print('---------------------------')
-        print('---------------------------')
-        print("self.noise before updating:", [noise.mean() if noise is not None else noise for noise in self.noise])
-        print("bw layers to update:", [hasattr(layer, 'bw_weights') for i, layer in list(enumerate(self.layers))[1:]])
+        # print('---------------------------')
+        # print('---------------------------')
+        # print("self.noise before updating:", [noise.mean() if noise is not None else noise for noise in self.noise])
+        # print("bw layers to update:", [hasattr(layer, 'bw_weights') for i, layer in list(enumerate(self.layers))[1:]])
         if self.algorithm == 'PAL':
             for i, layer in list(enumerate(self.layers))[1:]:
                 if hasattr(layer, 'bw_weights'):
-                    print('---------------------------')
-                    print(f"updating layer {layer}")
+                    # print('---------------------------')
+                    # print(f"updating layer {layer}")
                     layer.update_bw_weights(self.rho_HP[i + 1], self.noise[i - 1], self.with_optimizer)
 
     def get_errors(self):
