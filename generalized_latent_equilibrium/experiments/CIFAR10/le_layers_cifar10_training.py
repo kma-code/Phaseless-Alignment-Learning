@@ -445,12 +445,12 @@ if __name__ == '__main__':
         logging.info("Evaluating model before training (val+test)")
 
         logging.info(f"Target type: {model.target_type}")
-        # val, deg_WTB = validate_model(model, val_loader)
-        # val_acc.append(val)
-        # if rec_degs and deg_arr is not None:
-        #     deg_arr.append(deg_WTB)
+        val, deg_WTB = validate_model(model, val_loader)
+        val_acc.append(val)
+        if rec_degs and deg_arr is not None:
+            deg_arr.append(deg_WTB)
 
-        # test_model(model, test_loader)
+        test_model(model, test_loader)
 
         logging.basicConfig(format='Train model -- %(levelname)s: %(message)s',
                     level=logging.INFO, force=True)
