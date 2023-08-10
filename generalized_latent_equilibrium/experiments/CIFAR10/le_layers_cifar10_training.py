@@ -370,14 +370,14 @@ if __name__ == '__main__':
     train_set = datasets.CIFAR10(root=PATH_SCRIPT + '/cifar10_data', train=True, transform=transform, target_transform=target_transform,download=True)
     test_set  = datasets.CIFAR10(root=PATH_SCRIPT + '/cifar10_data', train=False, transform=transform, target_transform=target_transform,download=True)
     # cut down training and test sets for debugging
-    # indices = torch.arange(1_0)
-    # train_set = data_utils.Subset(train_set, indices)
-    # indices = torch.arange(100)
-    # test_set = data_utils.Subset(test_set, indices)
+    indices = torch.arange(128)
+    train_set = data_utils.Subset(train_set, indices)
+    indices = torch.arange(64)
+    test_set = data_utils.Subset(test_set, indices)
 
     classes = classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
 
-    val_size = 10_000
+    val_size = 32#10_000
     train_size = len(train_set) - val_size
 
     train_set, val_set = random_split(train_set, [train_size, val_size], generator=torch.Generator().manual_seed(seed))

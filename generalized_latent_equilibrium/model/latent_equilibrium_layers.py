@@ -95,8 +95,8 @@ class Conv2d(object):
         Returns:
 
         """
-        batch_size = self.rho_flat.shape[0]
-        if len(self.voltages.shape) != 3 or self.voltages.shape[0] != batch_size:
+        self.batch_size = self.rho_flat.shape[0]
+        if len(self.voltages.shape) != 3 or self.voltages.shape[0] != self.batch_size:
             voltage_size = self.voltages.shape[0]
             repeats = int(batch_size / voltage_size)
             remainder = batch_size % voltage_size
@@ -334,11 +334,11 @@ class Conv2d_PAL(Conv2d):
         Returns:
 
         """
-        batch_size = self.rho_flat.shape[0]
-        if len(self.voltages.shape) != 3 or self.voltages.shape[0] != batch_size:
+        self.batch_size = self.rho_flat.shape[0]
+        if len(self.voltages.shape) != 3 or self.voltages.shape[0] != self.batch_size:
             voltage_size = self.voltages.shape[0]
-            repeats = int(batch_size / voltage_size)
-            remainder = batch_size % voltage_size
+            repeats = int(self.batch_size / voltage_size)
+            remainder = self.batch_size % voltage_size
             repetition_vector = torch.tensor([repeats], device=self.device).repeat(voltage_size)
             repetition_vector[-1] = repetition_vector[-1] + remainder
 
@@ -406,7 +406,9 @@ class Conv2d_PAL(Conv2d):
         # print(f"rho_HP_flat {rho_HP_flat.size()}")
         # print(f"noise_flat {noise_flat.size()}")
         # print(f"einsum {(torch.einsum('bif,bjf->bfij', rho_HP_flat, noise_flat)).mean(0).mean(0).size()}")
-        return (torch.einsum('bif,bjf->bfij', rho_HP_flat, noise_flat)).mean(0).mean(0) - self.regularizer * self.bw_weights
+
+        # dB = (torch.einsum('bif,bjf->bfij', rho_HP_flat, noise_flat)).mean(0).mean(0)
+        return (torch.einsum('bif,bjf->ij', rho_HP_flat, noise_flat))/self.batch_size - self.regularizer * self.bw_weights
 
 
     def update_bw_weights(self, rho_HP, noise, with_optimizer=False):
@@ -465,11 +467,11 @@ class MaxPool2d(object):
         Returns:
 
         """
-        batch_size = self.rho_input.shape[0]
-        if len(self.voltages.shape) != 2 or self.voltages.shape[0] != batch_size:
+        self.batch_size = self.rho_input.shape[0]
+        if len(self.voltages.shape) != 2 or self.voltages.shape[0] != self.batch_size:
             voltage_size = self.voltages.shape[0]
-            repeats = int(batch_size / voltage_size)
-            remainder = batch_size % voltage_size
+            repeats = int(self.batch_size / voltage_size)
+            remainder = self.batch_size % voltage_size
             repetition_vector = torch.tensor([repeats], device=self.device).repeat(voltage_size)
             repetition_vector[-1] = repetition_vector[-1] + remainder
 
@@ -628,11 +630,11 @@ class Projection(object):
         Returns:
 
         """
-        batch_size = self.rho_input.shape[0]
-        if len(self.voltages.shape) != 2 or self.voltages.shape[0] != batch_size:
+        self.batch_size = self.rho_input.shape[0]
+        if len(self.voltages.shape) != 2 or self.voltages.shape[0] != self.batch_size:
             voltage_size = self.voltages.shape[0]
-            repeats = int(batch_size / voltage_size)
-            remainder = batch_size % voltage_size
+            repeats = int(self.batch_size / voltage_size)
+            remainder = self.batch_size % voltage_size
             repetition_vector = torch.tensor([repeats], device=self.device).repeat(voltage_size)
             repetition_vector[-1] = repetition_vector[-1] + remainder
 
@@ -857,11 +859,11 @@ class Projection_PAL(Projection):
         Returns:
 
         """
-        batch_size = self.rho_input.shape[0]
-        if len(self.voltages.shape) != 2 or self.voltages.shape[0] != batch_size:
+        self.batch_size = self.rho_input.shape[0]
+        if len(self.voltages.shape) != 2 or self.voltages.shape[0] != self.batch_size:
             voltage_size = self.voltages.shape[0]
-            repeats = int(batch_size / voltage_size)
-            remainder = batch_size % voltage_size
+            repeats = int(self.batch_size / voltage_size)
+            remainder = self.batch_size % voltage_size
             repetition_vector = torch.tensor([repeats], device=self.device).repeat(voltage_size)
             repetition_vector[-1] = repetition_vector[-1] + remainder
 
@@ -941,7 +943,7 @@ class Projection_PAL(Projection):
         # print(f"rho_HP in get_bw_weight_derivatives: {rho_HP.mean()}, {rho_HP.size()}")
         # print(f"noise in get_bw_weight_derivatives: {noise.mean() if noise is not None else noise}, {noise.reshape(self.batch_size, self.Hid).size()}")
         # print("bw_weights:", self.bw_weights.size())
-        return (torch.einsum('bi,bj->bij', rho_HP, noise.reshape(self.batch_size, self.Hid))).mean(0) - self.regularizer * self.bw_weights
+        return (torch.einsum('bi,bj->ij', rho_HP, noise.reshape(self.batch_size, self.Hid)))/self.batch_size - self.regularizer * self.bw_weights
 
     def get_PAL_parameters(self):
         param_dict = {"learning_rate_bw": self.learning_rate_B,
@@ -1012,11 +1014,11 @@ class Linear(object):
         Returns:
 
         """
-        batch_size = self.rho_input.shape[0]
-        if len(self.voltages.shape) != 2 or self.voltages.shape[0] != batch_size:
+        self.batch_size = self.rho_input.shape[0]
+        if len(self.voltages.shape) != 2 or self.voltages.shape[0] != self.batch_size:
             voltage_size = self.voltages.shape[0]
-            repeats = int(batch_size / voltage_size)
-            remainder = batch_size % voltage_size
+            repeats = int(self.batch_size / voltage_size)
+            remainder = self.batch_size % voltage_size
             repetition_vector = torch.tensor([repeats], device=self.device).repeat(voltage_size)
             repetition_vector[-1] = repetition_vector[-1] + remainder
 
@@ -1243,11 +1245,11 @@ class Linear_PAL(Linear):
         Returns:
 
         """
-        batch_size = self.rho_input.shape[0]
-        if len(self.voltages.shape) != 2 or self.voltages.shape[0] != batch_size:
+        self.batch_size = self.rho_input.shape[0]
+        if len(self.voltages.shape) != 2 or self.voltages.shape[0] != self.batch_size:
             voltage_size = self.voltages.shape[0]
-            repeats = int(batch_size / voltage_size)
-            remainder = batch_size % voltage_size
+            repeats = int(self.batch_size / voltage_size)
+            remainder = self.batch_size % voltage_size
             repetition_vector = torch.tensor([repeats], device=self.device).repeat(voltage_size)
             repetition_vector[-1] = repetition_vector[-1] + remainder
 
@@ -1336,7 +1338,7 @@ class Linear_PAL(Linear):
 
         """
 
-        return (torch.einsum('bi,bj->bij', rho_HP, noise)).mean(0) - self.regularizer * self.bw_weights
+        return (torch.einsum('bi,bj->ij', rho_HP, noise))/self.batch_size- self.regularizer * self.bw_weights
 
     def get_PAL_parameters(self):
         param_dict = {"learning_rate_bw": self.learning_rate_B,
@@ -1688,11 +1690,11 @@ class LESequential(object):
         Returns:
 
         """
-        batch_size = x.shape[0]
-        if self.rho[1].shape[0] != batch_size:
+        self.batch_size = x.shape[0]
+        if self.rho[1].shape[0] != self.batch_size:
             rho_size = self.rho[1].shape[0]
-            repeats = int(batch_size / rho_size)
-            remainder = batch_size % rho_size
+            repeats = int(self.batch_size / rho_size)
+            remainder = self.batch_size % rho_size
             repetition_vector = torch.tensor([repeats], device=self.device).repeat(rho_size)
             repetition_vector[-1] = repetition_vector[-1] + remainder
 
