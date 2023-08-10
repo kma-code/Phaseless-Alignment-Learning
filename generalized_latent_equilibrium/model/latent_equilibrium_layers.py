@@ -24,7 +24,7 @@ def dataloader_seed_worker(worker_id):
 
 
 class Conv2d(object):
-    def __init__(self, num_channels, num_filters, kernel_size, batch_size, input_size, act_function, padding=0, stride=1, learning_rate=0.1, algorithm='BP', wn_sigma=0):
+    def __init__(self, num_channels, num_filters, kernel_size, batch_size, input_size, act_function, padding=0, stride=1, learning_rate=0.1, algorithm='BP', wn_sigma=0, tau_LO=None):
         self.input_size = input_size
         self.num_channels = num_channels
         self.num_filters = num_filters
@@ -38,6 +38,8 @@ class Conv2d(object):
         self.dt = 0.1
         self.learning_rate_W = learning_rate
         self.learning_rate_biases = learning_rate
+        # low-pass on weight/bias updates
+        self.tau_LO = tau_LO
 
         self.act_function = act_function.f
         self.act_func_deriv = act_function.df
@@ -50,6 +52,9 @@ class Conv2d(object):
 
         self.kernel = torch.empty(self.num_filters, self.num_channels, self.kernel_size, self.kernel_size).normal_(mean=0, std=0.05).to(self.device)
         self.biases = torch.empty(self.num_filters).normal_(mean=0, std=0.05).to(self.device)
+        self.kernel_grad_LO = torch.empty(self.num_filters, self.num_channels, self.kernel_size, self.kernel_size).to(self.device)
+        self.biases_grad_LO = torch.empty(self.num_filters).to(self.device)
+
         if self.algorithm == 'FA':
             self.bw_weights = self.kernel.reshape(self.num_filters, -1)
 
@@ -135,8 +140,17 @@ class Conv2d(object):
             self.biases.grad = -self.dt * dot_biases  # our gradients are inverse to pytorch gradients
 
             if not with_optimizer:  # minus because pytorch gradients are inverse to our gradients
-                self.kernel -= self.kernel.grad * self.learning_rate_W
-                self.biases -= self.biases.grad * self.learning_rate_biases
+                if self.tau_LO in [None, 0.0]:
+                    # print('--- Updating kernel in conv2d layer')
+                    self.kernel -= self.kernel.grad * self.learning_rate_W
+                    self.biases -= self.biases.grad * self.learning_rate_biases
+                else:
+                    # low-pass filter updates
+                    # print('--- Updating kernel in conv2d layer with low-pass')
+                    self.kernel_grad_LO += self.dt / self.tau_LO * (self.kernel_grad_LO - self.kernel.grad)
+                    self.kernel -= self.kernel_grad_LO * self.learning_rate_W
+                    self.biases_grad_LO += self.dt / self.tau_LO * (self.biases_grad_LO - self.biases.grad)
+                    self.biases -= self.biases_grad_LO * self.learning_rate_biases
 
         return previous_layer_errors
 
@@ -218,7 +232,7 @@ class Conv2d_PAL(Conv2d):
     def __init__(self, num_channels, num_filters, kernel_size, batch_size, input_size, act_function, padding=0, stride=1, algorithm='PAL', learning_rate=0.1, learning_rate_bw=1.0, regularizer=1e-3, tau_xi=1.0, tau_HP=1.0, tau_LO=1000.0, sigma=1e-2, wn_sigma=0.0):
 
         # init parent class with same settings
-        super().__init__(num_channels=num_channels, num_filters=num_filters, kernel_size=kernel_size, batch_size=batch_size, input_size=input_size, act_function=act_function, padding=padding, stride=stride, learning_rate=learning_rate, algorithm=algorithm, wn_sigma=wn_sigma)
+        super().__init__(num_channels=num_channels, num_filters=num_filters, kernel_size=kernel_size, batch_size=batch_size, input_size=input_size, act_function=act_function, padding=padding, stride=stride, learning_rate=learning_rate, algorithm=algorithm, wn_sigma=wn_sigma, tau_LO=tau_LO)
 
 
         if self.algorithm != 'PAL':
@@ -236,7 +250,6 @@ class Conv2d_PAL(Conv2d):
         self.sigma = sigma      # scale of injected noise
 
         self.bw_weights = self.kernel.reshape(self.num_filters, -1)
-        self.bw_weights_grad_LO = self.kernel.reshape(self.num_filters, -1)
         self.noise = torch.zeros([1, self.num_filters, self.target_size, self.target_size], device=self.device)
         self.rho_HP = torch.zeros([1, self.num_filters, self.target_size, self.target_size], device=self.device)
         self.Delta_rho = torch.zeros([1, self.num_filters, self.target_size, self.target_size], device=self.device)
@@ -404,11 +417,7 @@ class Conv2d_PAL(Conv2d):
             self.bw_weights.grad = -self.dt * dot_bw_weights  # our gradients are inverse to pytorch gradients
 
             if not with_optimizer:  # minus because pytorch gradients are inverse to our gradients
-                if self.tau_LO is None or self.tau_LO == 0.0:
-                    self.bw_weights -= self.bw_weights.grad * self.learning_rate_B
-                else:
-                    self.bw_weights_grad_LO += self.dt / self.tau_LO * (self.bw_weights.grad - self.bw_weights_grad_LO)
-                    self.bw_weights -= self.bw_weights_grad_LO * self.learning_rate_B
+                self.bw_weights -= self.bw_weights.grad * self.learning_rate_B
 
 
 class MaxPool2d(object):
@@ -561,7 +570,7 @@ class AvgPool2d(object):
 
 
 class Projection(object):
-    def __init__(self, input_size, target_size, act_function, dtype=torch.float32, algorithm='BP'):
+    def __init__(self, input_size, target_size, act_function, dtype=torch.float32, algorithm='BP', tau_LO=None):
         self.input_size = input_size
         self.B, self.C, self.H, self.W = self.input_size
         self.batch_size = self.B
@@ -572,7 +581,9 @@ class Projection(object):
         self.tau = 10.0
         self.dt = 0.1
         self.learning_rate_W = 0
-        self.learning_rate_biases = 0
+        self.learning_rate_biases = 0 
+        # low-pass on weight/bias updates
+        self.tau_LO = tau_LO
 
         self.algorithm = algorithm
 
@@ -585,6 +596,8 @@ class Projection(object):
         if self.algorithm == 'FA':
             self.bw_weights = torch.empty([self.Hid, self.target_size]).T.normal_(mean=0.0, std=0.05).to(self.device)
         self.biases = torch.empty(self.target_size).normal_(mean=0.0, std=0.05).to(self.device)
+        self.weights_grad_LO = torch.empty((self.Hid, self.target_size)).to(self.device)
+        self.biases_grad_LO = torch.empty(self.target_size).to(self.device)
 
         self.voltages = torch.zeros([1, self.target_size], device=self.device)
         self.voltages_deriv = None
@@ -658,8 +671,18 @@ class Projection(object):
             self.biases.grad = -self.dt * dot_biases # our gradients are inverse to pytorch gradients
 
             if not with_optimizer:  # minus because pytorch gradients are inverse to our gradients
-                self.weights -= self.weights.grad * self.learning_rate_W
-                self.biases -= self.biases.grad * self.learning_rate_biases
+                if self.tau_LO in [None, 0.0]:
+                    # print('--- Updating weights in projection layer')
+                    self.weights -= self.weights.grad * self.learning_rate_W
+                    self.biases -= self.biases.grad * self.learning_rate_biases
+                else:
+                    # low-pass filter updates
+                    # print('--- Updating weights in projection layer with low-pass')
+                    self.weights_grad_LO += self.dt / self.tau_LO * (self.weights_grad_LO - self.weights.grad)
+                    self.weights -= self.weights_grad_LO * self.learning_rate_W
+                    self.biases_grad_LO += self.dt / self.tau_LO * (self.biases_grad_LO - self.biases.grad)
+                    self.biases -= self.biases_grad_LO * self.learning_rate_biases
+
 
         return previous_layer_errors
 
@@ -739,7 +762,7 @@ class Projection_PAL(Projection):
     def __init__(self, input_size, target_size, act_function, algorithm='PAL', dtype=torch.float32, learning_rate=0.1, learning_rate_bw=1.0, regularizer=1e-3, tau_xi=1.0, tau_HP=1.0, tau_LO=1000.0, sigma=1e-2, wn_sigma=0.0):
 
         # init parent class with same settings
-        super().__init__(input_size=input_size, target_size=target_size, act_function=act_function, algorithm=algorithm, dtype=torch.float32)
+        super().__init__(input_size=input_size, target_size=target_size, act_function=act_function, algorithm=algorithm, dtype=torch.float32, tau_LO=tau_LO)
 
 
         if self.algorithm != 'PAL':
@@ -932,7 +955,7 @@ class Projection_PAL(Projection):
 
 
 class Linear(object):
-    def __init__(self, input_size, target_size, act_function, algorithm='BP', dtype=torch.float32, learning_rate=0.1, wn_sigma=0):
+    def __init__(self, input_size, target_size, act_function, algorithm='BP', dtype=torch.float32, learning_rate=0.1, wn_sigma=0, tau_LO=None):
         self.input_size = input_size
         self.target_size = target_size
         self.act_function = act_function.f
@@ -942,6 +965,8 @@ class Linear(object):
         self.dt = 0.1
         self.learning_rate_W = learning_rate
         self.learning_rate_biases = learning_rate
+        # low-pass on weight/bias updates
+        self.tau_LO = tau_LO
 
         self.dtype = dtype
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -955,6 +980,8 @@ class Linear(object):
         if self.algorithm == 'FA':
             self.bw_weights = torch.empty([self.input_size, self.target_size]).T.normal_(mean=0.0, std=0.05).to(self.device)
         self.biases = torch.empty(self.target_size).normal_(mean=0.0, std=0.05).to(self.device)
+        self.weights_grad_LO = torch.empty([self.input_size, self.target_size]).to(self.device)
+        self.biases_grad_LO = torch.empty(self.target_size).to(self.device)
 
         self.voltages = torch.zeros([1, self.target_size], device=self.device)
         self.voltages_deriv = None
@@ -1028,8 +1055,19 @@ class Linear(object):
             self.biases.grad = -self.dt * dot_biases  # our gradients are inverse to pytorch gradients
 
             if not with_optimizer:  # minus because pytorch gradients are inverse to our gradients
-                self.weights -= self.weights.grad * self.learning_rate_W
-                self.biases -= self.biases.grad * self.learning_rate_biases
+                if self.tau_LO in [None, 0.0]:
+                    # print('--- Updating weights in linear layer')
+                    self.weights -= self.weights.grad * self.learning_rate_W
+                    self.biases -= self.biases.grad * self.learning_rate_biases
+                else:
+                    # low-pass filter updates
+                    # print('--- Updating weights in linear layer with low-pass')
+                    self.weights_grad_LO += self.dt / self.tau_LO * (self.weights_grad_LO - self.weights.grad)
+                    self.weights -= self.weights_grad_LO * self.learning_rate_W
+                    self.biases_grad_LO += self.dt / self.tau_LO * (self.biases_grad_LO - self.biases.grad)
+                    self.biases -= self.biases_grad_LO * self.learning_rate_biases
+
+
 
         return previous_layer_errors
 
@@ -1112,7 +1150,7 @@ class Linear_PAL(Linear):
     def __init__(self, input_size, target_size, act_function, algorithm='PAL', dtype=torch.float32, learning_rate=0.1, learning_rate_bw=1.0, regularizer=1e-3, tau_xi=1.0, tau_HP=1.0, tau_LO=1000.0, sigma=1e-2, wn_sigma=0.0):
 
         # init parent class with same settings
-        super().__init__(input_size=input_size, target_size=target_size, act_function=act_function, algorithm=algorithm, dtype=torch.float32, learning_rate=learning_rate, wn_sigma=wn_sigma)
+        super().__init__(input_size=input_size, target_size=target_size, act_function=act_function, algorithm=algorithm, dtype=torch.float32, learning_rate=learning_rate, wn_sigma=wn_sigma, tau_LO=tau_LO)
 
 
         if self.algorithm != 'PAL':
@@ -1268,14 +1306,7 @@ class Linear_PAL(Linear):
             self.bw_weights.grad = -self.dt * dot_bw_weights  # our gradients are inverse to pytorch gradients
 
             if not with_optimizer:  # minus because pytorch gradients are inverse to our gradients
-                if self.tau_LO is None or self.tau_LO == 0.0:
-                    self.bw_weights -= self.bw_weights.grad * self.learning_rate_B
-                else:
-                    self.bw_weights_grad_LO += self.dt / self.tau_LO * (self.bw_weights.grad - self.bw_weights_grad_LO)
-                    self.bw_weights -= self.bw_weights_grad_LO * self.learning_rate_B
-
-
-
+                self.bw_weights -= self.bw_weights.grad * self.learning_rate_B
 
     # ### CALCULATE WEIGHT DERIVATIVES ### #
 
@@ -1329,9 +1360,9 @@ class LESequential(object):
         if self.algorithm == 'PAL':
             self.bw_lr_factors = kwargs.get('bw_lr_factors', None)
             self.regularizer = kwargs.get('regularizer', None)
-            self.tau_xi = [tau_xi * self.dt for tau_xi in kwargs.get('tau_xi', None)]     # PAL time constants are passed in multiples of dt
-            self.tau_HP = [tau_HP * self.dt for tau_HP in kwargs.get('tau_HP', None)]
-            self.tau_LO = [tau_LO * self.dt for tau_LO in kwargs.get('tau_LO', None)]
+            self.tau_xi = [tau_xi * self.dt if tau_xi is not None else None for tau_xi in kwargs.get('tau_xi', None)]     # PAL time constants are passed in multiples of dt
+            self.tau_HP = [tau_HP * self.dt if tau_HP is not None else None for tau_HP in kwargs.get('tau_HP', None)]
+            self.tau_LO = [tau_LO * self.dt if tau_LO is not None else None for tau_LO in kwargs.get('tau_LO', None)]
             self.sigma = kwargs.get('sigma', None)
         self.wn_sigma = kwargs.get('wn_sigma', None)
 

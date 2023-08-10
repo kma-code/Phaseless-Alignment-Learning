@@ -250,12 +250,14 @@ if __name__ == '__main__':
     parser.add_argument('--regularizer', default=[1e-4,1e-4,1e-4,1e-4,1e-4,1e-4], help="Size of weight decay regularizer")
     parser.add_argument('--tau_xi', default=[10,10,10,10,10,10], help="Filter constant of Ornstein-Uhlenbeck noise (given in time steps dt)")
     parser.add_argument('--tau_HP', default=[10,10,10,10,10,10], help="Time constant of high-pass filter (given in time steps dt)")
-    parser.add_argument('--tau_LO', default=[1e+4,1e+4,1e+4,1e+4,1e+4,1e+4], help="Time constant of low-pass filter in forward weights (given in time steps dt)")
+    parser.add_argument('--tau_LO', default=[None,1e+4,1e+4,1e+4,1e+4,None], help="Time constant of low-pass filter in forward weights (given in time steps dt)")
     parser.add_argument('--sigma', default=[1e-2,1e-2,1e-2,1e-2,1e-2,0], help="Stdev of Ornstein-Uhlenbeck noise injected into each layer")
     # recording of params
     parser.add_argument('--rec_degs', default=False, action='store_true', help="Record angle between W.T and B")
     parser.add_argument('--rec_activations', default=False, action='store_true', help="Record activations after every presentation time")
     parser.add_argument('--rec_noise', default=False, action='store_true', help="Record injected noise (PAL only)")
+    # whether to test and validate before training
+    parser.add_argument('--debug', default=False, action='store_true', help="Disable testing and validation before training")
 
 
     args = parser.parse_args()
@@ -324,6 +326,8 @@ if __name__ == '__main__':
         rec_degs = args.rec_degs
         rec_activations = args.rec_activations
         rec_noise = args.rec_noise
+    
+    DEBUG = args.debug
 
     with_optimizer = False
 
@@ -445,12 +449,13 @@ if __name__ == '__main__':
         logging.info("Evaluating model before training (val+test)")
 
         logging.info(f"Target type: {model.target_type}")
-        val, deg_WTB = validate_model(model, val_loader)
-        val_acc.append(val)
-        if rec_degs and deg_arr is not None:
-            deg_arr.append(deg_WTB)
+        if DEBUG == False:
+            val, deg_WTB = validate_model(model, val_loader)
+            val_acc.append(val)
+            if rec_degs and deg_arr is not None:
+                deg_arr.append(deg_WTB)
 
-        test_model(model, test_loader)
+            test_model(model, test_loader)
 
         logging.basicConfig(format='Train model -- %(levelname)s: %(message)s',
                     level=logging.INFO, force=True)
