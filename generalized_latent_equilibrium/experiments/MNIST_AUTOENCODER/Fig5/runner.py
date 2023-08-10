@@ -35,7 +35,8 @@ if __name__ == '__main__':
 
 
 
-	OUTPUT_DIR = PATH_runner / "runs"
+	#OUTPUT_DIR = PATH_runner / "runs"
+	OUTPUT_DIR = Path("/users/kmax/scratch/generalized_latent_equilibrium/runs")
 
 	# create a bunch of JSON param files in subfolders (lr/seeds/)
 	seeds = [1,5,7,9,11]
@@ -93,7 +94,7 @@ if __name__ == '__main__':
 
 				sim_dir = PATH_output
 				# start runs as separate processes
-				proc_name = ['python', 'experiments/le_layers_mnist_training.py', '--params', str(sim_dir / 'params.json')]
+				proc_name = ['sbatch', 'slurm_script_gpu_autoenc.sh', 'python', 'experiments/MNIST_AUTOENCODER/le_layers_mnist_training.py', '--params', str(sim_dir / 'params.json')]
 
 				logging.info(f"Starting run as subprocess {proc_name}.")
 				subprocess.Popen(proc_name, cwd=PATH_parent)
@@ -113,7 +114,7 @@ if __name__ == '__main__':
 					loaded_params = json.load(f)
 
 				# start runs as separate processes
-				proc_name = ['python', 'experiments/le_layers_mnist_linclass.py', '--params', str(sim_dir / 'params.json')]
+				proc_name = ['sbatch', 'slurm_script_gpu_autoenc.sh', 'python', 'experiments/MNIST_AUTOENCODER/le_layers_mnist_linclass.py', '--params', str(sim_dir / 'params.json')]
 
 				logging.info(f"Starting run as subprocess {proc_name}.")
 				proc_list.append(subprocess.Popen(proc_name, cwd=PATH_parent))
