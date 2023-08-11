@@ -147,9 +147,9 @@ class Conv2d(object):
                 else:
                     # low-pass filter updates
                     # print('--- Updating kernel in conv2d layer with low-pass')
-                    self.kernel_grad_LO += self.dt / self.tau_LO * (self.kernel_grad_LO - self.kernel.grad)
+                    self.kernel_grad_LO += self.dt / self.tau_LO * (self.kernel.grad - self.kernel_grad_LO)
                     self.kernel -= self.kernel_grad_LO * self.learning_rate_W
-                    self.biases_grad_LO += self.dt / self.tau_LO * (self.biases_grad_LO - self.biases.grad)
+                    self.biases_grad_LO += self.dt / self.tau_LO * (self.biases.grad - self.biases_grad_LO)
                     self.biases -= self.biases_grad_LO * self.learning_rate_biases
 
         return previous_layer_errors
@@ -680,9 +680,9 @@ class Projection(object):
                 else:
                     # low-pass filter updates
                     # print('--- Updating weights in projection layer with low-pass')
-                    self.weights_grad_LO += self.dt / self.tau_LO * (self.weights_grad_LO - self.weights.grad)
+                    self.weights_grad_LO += self.dt / self.tau_LO * (self.weights.grad - self.weights_grad_LO)
                     self.weights -= self.weights_grad_LO * self.learning_rate_W
-                    self.biases_grad_LO += self.dt / self.tau_LO * (self.biases_grad_LO - self.biases.grad)
+                    self.biases_grad_LO += self.dt / self.tau_LO * (self.biases.grad - self.biases_grad_LO)
                     self.biases -= self.biases_grad_LO * self.learning_rate_biases
 
 
@@ -782,7 +782,6 @@ class Projection_PAL(Projection):
         self.sigma = sigma      # scale of injected noise
 
         self.bw_weights = torch.empty([self.Hid, self.target_size]).T.normal_(mean=0.0, std=0.05).to(self.device)
-        self.bw_weights_grad_LO = torch.empty([self.Hid, self.target_size]).T.normal_(mean=0.0, std=0.05).to(self.device)
         self.noise = torch.zeros([1, self.target_size], device=self.device)
         self.rho_HP = torch.zeros([1, self.target_size], device=self.device)
         self.Delta_rho = torch.zeros([1, self.target_size], device=self.device)
@@ -922,11 +921,7 @@ class Projection_PAL(Projection):
             self.bw_weights.grad = -self.dt * dot_bw_weights  # our gradients are inverse to pytorch gradients
 
             if not with_optimizer:  # minus because pytorch gradients are inverse to our gradients
-                if self.tau_LO is None or self.tau_LO == 0.0:
-                    self.bw_weights -= self.bw_weights.grad * self.learning_rate_B
-                else:
-                    self.bw_weights_grad_LO += self.dt / self.tau_LO * (self.bw_weights.grad - self.bw_weights_grad_LO)
-                    self.bw_weights -= self.bw_weights_grad_LO * self.learning_rate_B
+                self.bw_weights -= self.bw_weights.grad * self.learning_rate_B
 
 
     # ### CALCULATE BW WEIGHT DERIVATIVES ### #
@@ -1064,9 +1059,9 @@ class Linear(object):
                 else:
                     # low-pass filter updates
                     # print('--- Updating weights in linear layer with low-pass')
-                    self.weights_grad_LO += self.dt / self.tau_LO * (self.weights_grad_LO - self.weights.grad)
+                    self.weights_grad_LO += self.dt / self.tau_LO * (self.weights.grad - self.weights_grad_LO)
                     self.weights -= self.weights_grad_LO * self.learning_rate_W
-                    self.biases_grad_LO += self.dt / self.tau_LO * (self.biases_grad_LO - self.biases.grad)
+                    self.biases_grad_LO += self.dt / self.tau_LO * (self.biases.grad - self.biases_grad_LO)
                     self.biases -= self.biases_grad_LO * self.learning_rate_biases
 
 
@@ -1170,7 +1165,6 @@ class Linear_PAL(Linear):
         self.sigma = sigma      # scale of injected noise
 
         self.bw_weights = torch.empty([self.input_size, self.target_size]).T.normal_(mean=0.0, std=0.05).to(self.device)
-        self.bw_weights_grad_LO = torch.empty([self.input_size, self.target_size]).T.normal_(mean=0.0, std=0.05).to(self.device)
         self.noise = torch.zeros([1, self.target_size], device=self.device)
         self.rho_HP = torch.zeros([1, self.target_size], device=self.device)
         self.Delta_rho = torch.zeros([1, self.target_size], device=self.device)
