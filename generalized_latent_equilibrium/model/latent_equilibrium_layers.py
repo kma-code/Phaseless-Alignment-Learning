@@ -98,8 +98,8 @@ class Conv2d(object):
         self.batch_size = self.rho_flat.shape[0]
         if len(self.voltages.shape) != 3 or self.voltages.shape[0] != self.batch_size:
             voltage_size = self.voltages.shape[0]
-            repeats = int(batch_size / voltage_size)
-            remainder = batch_size % voltage_size
+            repeats = int(self.batch_size / voltage_size)
+            remainder = self.batch_size % voltage_size
             repetition_vector = torch.tensor([repeats], device=self.device).repeat(voltage_size)
             repetition_vector[-1] = repetition_vector[-1] + remainder
 
