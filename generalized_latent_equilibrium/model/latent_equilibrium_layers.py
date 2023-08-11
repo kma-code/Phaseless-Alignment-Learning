@@ -701,7 +701,7 @@ class Projection(object):
         """
         # If the input is served as a single sample, it is not in batch form, but this here requires it.
         rho_input_flat = self.rho_input.reshape((len(self.rho_input), -1))
-        return (torch.einsum('bi,bj->bij', rho_input_flat, self.errors)).mean(0)
+        return (torch.einsum('bi,bj->ij', rho_input_flat, self.errors))/self.batch_size
 
     # ### CALCULATE BIAS DERIVATIVES ### #
 
@@ -1087,7 +1087,7 @@ class Linear(object):
         # If the input is served as a single sample, it is not in batch form, but this here requires it.
         if len(self.rho_input.shape) == 1:
             self.rho_input = self.rho_input.unsqueeze(0)
-        return (torch.einsum('bi,bj->bij', self.rho_input, self.errors)).mean(0)
+        return (torch.einsum('bi,bj->ij', self.rho_input, self.errors))/self.batch_size
 
     # ### CALCULATE BIAS DERIVATIVES ### #
 
@@ -1312,22 +1312,6 @@ class Linear_PAL(Linear):
 
     # ### CALCULATE WEIGHT DERIVATIVES ### #
 
-    def get_weight_derivatives(self):
-        """
-        Return weight derivative calculated from current rate and errors.
-        Args:
-
-        Returns:
-            weight_derivative: e * r^T * η
-
-        """
-        # If the input is served as a single sample, it is not in batch form, but this here requires it.
-        if len(self.rho_input.shape) == 1:
-            self.rho_input = self.rho_input.unsqueeze(0)
-        return (torch.einsum('bi,bj->bij', self.rho_input, self.errors)).mean(0)
-
-    # ### CALCULATE WEIGHT DERIVATIVES ### #
-
     def get_bw_weight_derivatives(self, rho_HP, noise):
         """
         Return weight derivative calculated from current rate and errors.
@@ -1337,8 +1321,7 @@ class Linear_PAL(Linear):
             weight_derivative: noise * r_HP^T
 
         """
-
-        return (torch.einsum('bi,bj->ij', rho_HP, noise))/self.batch_size- self.regularizer * self.bw_weights
+        return (torch.einsum('bi,bj->ij', rho_HP, noise))/self.batch_size - self.regularizer * self.bw_weights
 
     def get_PAL_parameters(self):
         param_dict = {"learning_rate_bw": self.learning_rate_B,
