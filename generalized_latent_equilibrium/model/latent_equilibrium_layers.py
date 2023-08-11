@@ -52,8 +52,8 @@ class Conv2d(object):
 
         self.kernel = torch.empty(self.num_filters, self.num_channels, self.kernel_size, self.kernel_size).normal_(mean=0, std=0.05).to(self.device)
         self.biases = torch.empty(self.num_filters).normal_(mean=0, std=0.05).to(self.device)
-        self.kernel_grad_LO = torch.empty(self.num_filters, self.num_channels, self.kernel_size, self.kernel_size).to(self.device)
-        self.biases_grad_LO = torch.empty(self.num_filters).to(self.device)
+        self.kernel_grad_LO = torch.zeros(self.num_filters, self.num_channels, self.kernel_size, self.kernel_size).to(self.device)
+        self.biases_grad_LO = torch.zeros(self.num_filters).to(self.device)
 
         if self.algorithm == 'FA':
             self.bw_weights = self.kernel.reshape(self.num_filters, -1)
@@ -598,8 +598,8 @@ class Projection(object):
         if self.algorithm == 'FA':
             self.bw_weights = torch.empty([self.Hid, self.target_size]).T.normal_(mean=0.0, std=0.05).to(self.device)
         self.biases = torch.empty(self.target_size).normal_(mean=0.0, std=0.05).to(self.device)
-        self.weights_grad_LO = torch.empty((self.Hid, self.target_size)).to(self.device)
-        self.biases_grad_LO = torch.empty(self.target_size).to(self.device)
+        self.weights_grad_LO = torch.zeros((self.Hid, self.target_size)).to(self.device)
+        self.biases_grad_LO = torch.zeros(self.target_size).to(self.device)
 
         self.voltages = torch.zeros([1, self.target_size], device=self.device)
         self.voltages_deriv = None
@@ -977,8 +977,8 @@ class Linear(object):
         if self.algorithm == 'FA':
             self.bw_weights = torch.empty([self.input_size, self.target_size]).T.normal_(mean=0.0, std=0.05).to(self.device)
         self.biases = torch.empty(self.target_size).normal_(mean=0.0, std=0.05).to(self.device)
-        self.weights_grad_LO = torch.empty([self.input_size, self.target_size]).to(self.device)
-        self.biases_grad_LO = torch.empty(self.target_size).to(self.device)
+        self.weights_grad_LO = torch.zeros([self.input_size, self.target_size]).to(self.device)
+        self.biases_grad_LO = torch.zeros(self.target_size).to(self.device)
 
         self.voltages = torch.zeros([1, self.target_size], device=self.device)
         self.voltages_deriv = None

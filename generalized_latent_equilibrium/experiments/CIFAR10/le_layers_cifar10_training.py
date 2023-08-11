@@ -250,7 +250,7 @@ if __name__ == '__main__':
     parser.add_argument('--regularizer', default=[1e-4,1e-4,1e-4,1e-4,1e-4,1e-4], help="Size of weight decay regularizer")
     parser.add_argument('--tau_xi', default=[10,10,10,10,10,10], help="Filter constant of Ornstein-Uhlenbeck noise (given in time steps dt)")
     parser.add_argument('--tau_HP', default=[10,10,10,10,10,10], help="Time constant of high-pass filter (given in time steps dt)")
-    parser.add_argument('--tau_LO', default=[None,1e+4,1e+4,1e+4,1e+4,None], help="Time constant of low-pass filter in forward weights (given in time steps dt)")
+    parser.add_argument('--tau_LO', default=[1e+4,1e+4,1e+4,1e+4,1e+4,1e+4], help="Time constant of low-pass filter in forward weights (given in time steps dt)")
     parser.add_argument('--sigma', default=[1e-2,1e-2,1e-2,1e-2,1e-2,0], help="Stdev of Ornstein-Uhlenbeck noise injected into each layer")
     # recording of params
     parser.add_argument('--rec_degs', default=False, action='store_true', help="Record angle between W.T and B")
