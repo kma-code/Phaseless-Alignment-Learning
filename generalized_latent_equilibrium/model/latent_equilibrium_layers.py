@@ -421,6 +421,16 @@ class Conv2d_PAL(Conv2d):
             if not with_optimizer:  # minus because pytorch gradients are inverse to our gradients
                 self.bw_weights -= self.bw_weights.grad * self.learning_rate_B
 
+    def get_PAL_parameters(self):
+        param_dict = {"learning_rate_bw": self.learning_rate_B,
+                "regularizer": self.regularizer,
+                "tau_xi": self.tau_xi,
+                "tau_HP": self.tau_HP,
+                "tau_LO": self.tau_LO,
+                "sigma": self.sigma,
+                "wn_sigma": self.wn_sigma}
+        return param_dict
+
 
 class MaxPool2d(object):
     # These are not really neurons...

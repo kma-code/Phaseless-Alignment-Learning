@@ -87,6 +87,10 @@ def LeNet5(batch_size, lr_multiplier, lr_factors, tau=10.0, dt=0.1, beta=0.1, al
         network = nn.LESequential([l1, l2, l3, l4, l5, l6], learning_rate, lr_factors, None, None,
                                   tau, dt, beta, model_variant, target_type, with_optimizer=with_optimizer, algorithm=algorithm,
                                   bw_lr_factors=bw_lr_factors, regularizer=regularizer, tau_xi=tau_xi, tau_HP=tau_HP, tau_LO=tau_LO, sigma=sigma, wn_sigma=wn_sigma)
+        for layer in network.layers:
+            if hasattr(layer, "get_PAL_parameters"):
+                logging.info(f"Initialized {layer} with PAL parameters {layer.get_PAL_parameters()}")
+
     else:
         l1 = nn.Conv2d(3, 20, 5, batch_size, 32, act_func, algorithm=algorithm)
         l2 = nn.MaxPool2d(2, algorithm=algorithm)
