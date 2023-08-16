@@ -183,11 +183,16 @@ def validate_model(model, val_loader):
     if model.algorithm in ["FA", "PAL"] and rec_degs:
         deg_WTB = []
         for layer in model.layers:
-            if hasattr(layer, 'weights'):
-                W = layer.weights.detach().cpu().numpy()
+            if hasattr(layer, 'bw_weights'):
+                if hasattr(layer, 'weights'):
+                    W = layer.weights.detach().cpu().numpy()
+                if hasattr(layer, 'weights_flat'):
+                    # for conv layers
+                    W = layer.weights_flat.T.detach().cpu().numpy()
                 B = layer.bw_weights.detach().cpu().numpy()
                 deg_WTB.append(deg(cos_sim(W.T, B)))
                 logging.info(f'Angle in layer {layer}: {deg_WTB[-1]}')
+
     else:
         deg_WTB = None
 
@@ -373,7 +378,7 @@ if __name__ == '__main__':
     # if not existing, download mnist dataset
     train_set = datasets.CIFAR10(root=PATH_SCRIPT + '/cifar10_data', train=True, transform=transform, target_transform=target_transform,download=True)
     test_set  = datasets.CIFAR10(root=PATH_SCRIPT + '/cifar10_data', train=False, transform=transform, target_transform=target_transform,download=True)
-    # cut down training and test sets for debugging
+    # # cut down training and test sets for debugging
     # indices = torch.arange(128)
     # train_set = data_utils.Subset(train_set, indices)
     # indices = torch.arange(64)

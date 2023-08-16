@@ -56,7 +56,8 @@ class Conv2d(object):
         self.biases_grad_LO = torch.zeros(self.num_filters).to(self.device)
 
         if self.algorithm == 'FA':
-            self.bw_weights = self.kernel.reshape(self.num_filters, -1)
+            self.bw_weights = torch.empty(self.num_filters, self.num_channels, self.kernel_size, self.kernel_size).normal_(mean=0, std=0.05).to(self.device)
+            self.bw_weights = self.bw_weights.reshape(self.num_filters, -1)
 
         self.unfold = nn.Unfold(kernel_size=(self.kernel_size, self.kernel_size),
                                 padding=self.padding,
@@ -249,7 +250,9 @@ class Conv2d_PAL(Conv2d):
 
         self.sigma = sigma      # scale of injected noise
 
-        self.bw_weights = self.kernel.reshape(self.num_filters, -1)
+        
+        self.bw_weights = torch.empty(self.num_filters, self.num_channels, self.kernel_size, self.kernel_size).normal_(mean=0, std=0.05).to(self.device)
+        self.bw_weights = self.bw_weights.reshape(self.num_filters, -1)
         self.noise = torch.zeros([1, self.num_filters, self.target_size, self.target_size], device=self.device)
         self.rho_HP = torch.zeros([1, self.num_filters, self.target_size, self.target_size], device=self.device)
         self.Delta_rho = torch.zeros([1, self.num_filters, self.target_size, self.target_size], device=self.device)
