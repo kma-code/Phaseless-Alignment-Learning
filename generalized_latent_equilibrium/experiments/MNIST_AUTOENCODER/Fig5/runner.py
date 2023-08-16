@@ -39,7 +39,7 @@ if __name__ == '__main__':
 	OUTPUT_DIR = Path("/users/kmax/scratch/generalized_latent_equilibrium/runs")
 
 	# create a bunch of JSON param files in subfolders (lr/seeds/)
-	seeds = [1,5,7,9,11]
+	seeds = [1,3,5,7,9,11,13,15,17,19]
 
 	params_arr = []
 	for i in [-3, -2]:
@@ -63,6 +63,7 @@ if __name__ == '__main__':
 						if algo == 'PAL':
 							params.update(
 									{
+                                                                "rec_weights": True,
 							        "bw_lr_factors": [0,1,1,1],
 							        "regularizer": [1e-4,1e-4,1e-4,1e-4],
 							        "tau_xi": [10,10,10,10],
