@@ -58,6 +58,9 @@ class Conv2d(object):
         if self.algorithm == 'FA':
             self.bw_weights = torch.empty(self.num_filters, self.num_channels, self.kernel_size, self.kernel_size).normal_(mean=0, std=0.05).to(self.device)
             self.bw_weights = self.bw_weights.reshape(self.num_filters, -1)
+        if self.algorithm == 'DFA':
+            self.bw_weights = torch.zeros(self.num_filters, self.num_channels, self.kernel_size, self.kernel_size).to(self.device)
+            self.bw_weights = self.bw_weights.reshape(self.num_filters, -1)
 
         self.unfold = nn.Unfold(kernel_size=(self.kernel_size, self.kernel_size),
                                 padding=self.padding,
@@ -203,7 +206,7 @@ class Conv2d(object):
         e = (voltage_lookaheads - basal_inputs).reshape(self.batch_size, self.num_filters, -1)
         if self.algorithm == 'BP':
             err = self.weights_flat.T @ e
-        elif self.algorithm =='FA':
+        elif self.algorithm in ['FA', 'DFA']:
             err = self.bw_weights.T @ e
         err = self.fold(err)
         err = rho_deriv * err
@@ -517,7 +520,7 @@ class MaxPool2d(object):
         else:
             rho_HP_out = torch.zeros_like(rho_out)
 
-        if self.algorithm in ['BP', 'FA']:
+        if self.algorithm in ['BP', 'FA', 'DFA']:
             return rho_out, rho_deriv_out
         elif self.algorithm == 'PAL':
             return rho_out, rho_deriv_out, rho_HP_out, noise_out
@@ -610,6 +613,8 @@ class Projection(object):
         self.weights = torch.empty((self.Hid, self.target_size)).normal_(mean=0.0, std=0.05).to(self.device)
         if self.algorithm == 'FA':
             self.bw_weights = torch.empty([self.Hid, self.target_size]).T.normal_(mean=0.0, std=0.05).to(self.device)
+        if self.algorithm == 'DFA':
+            self.bw_weights = torch.zeros([self.Hid, self.target_size]).T.to(self.device)
         self.biases = torch.empty(self.target_size).normal_(mean=0.0, std=0.05).to(self.device)
         self.weights_grad_LO = torch.zeros((self.Hid, self.target_size)).to(self.device)
         self.biases_grad_LO = torch.zeros(self.target_size).to(self.device)
@@ -746,7 +751,7 @@ class Projection(object):
         # e
         if self.algorithm == 'BP':
             err = torch.matmul(voltage_lookaheads - basal_inputs, self.weights.t())
-        elif self.algorithm == 'FA':
+        elif self.algorithm in ['FA', 'DFA']:
             err = torch.matmul(voltage_lookaheads - basal_inputs, self.bw_weights)
         err = err.reshape((len(err), self.C, self.H, self.W))
         err = rho_deriv * err
@@ -989,6 +994,8 @@ class Linear(object):
         self.weights = torch.empty([self.input_size, self.target_size]).normal_(mean=0.0, std=0.05).to(self.device)
         if self.algorithm == 'FA':
             self.bw_weights = torch.empty([self.input_size, self.target_size]).T.normal_(mean=0.0, std=0.05).to(self.device)
+        if self.algorithm == 'DFA':
+            self.bw_weights = torch.zeros([self.input_size, self.target_size]).T.to(self.device)
         self.biases = torch.empty(self.target_size).normal_(mean=0.0, std=0.05).to(self.device)
         self.weights_grad_LO = torch.zeros([self.input_size, self.target_size]).to(self.device)
         self.biases_grad_LO = torch.zeros(self.target_size).to(self.device)
@@ -1127,7 +1134,7 @@ class Linear(object):
         # e
         if self.algorithm == 'BP':
             err = rho_deriv * torch.matmul(voltage_lookaheads - basal_inputs, self.weights.t())
-        elif self.algorithm == 'FA':
+        elif self.algorithm in ['FA', 'DFA']:
             err = rho_deriv * torch.matmul(voltage_lookaheads - basal_inputs, self.bw_weights)
 
         return err
@@ -1406,6 +1413,28 @@ class LESequential(object):
         self.target_type = target_type
         self.with_optimizer = with_optimizer
 
+        if self.algorithm == 'DFA':
+            # init array of backward matrices and give to output layer
+            layers[-1].all_bw_weights = []
+            for i, l in enumerate(layers[:-1]):
+                if hasattr(l, "bw_weights"):
+                    # conv2d layers are different
+                    if isinstance(l, Conv2d):
+                        layers[-1].all_bw_weights.append(
+                            torch.empty([l.num_filters, l.target_size, l.target_size, layers[-1].target_size]).T.normal_(mean=0.0, std=0.05).to(self.device)
+                            )
+                    else:
+                        layers[-1].all_bw_weights.append(
+                            torch.empty([l.bw_weights.size()[0], layers[-1].target_size]).T.normal_(mean=0.0, std=0.05).to(self.device)
+                            )
+                else:
+                    layers[-1].all_bw_weights.append(None)
+        # for B in layers[-1].all_bw_weights:
+        #     print("B", B.size() if B is not None else None)
+        # for l in layers:
+        #     if hasattr(l, "bw_weights"):
+        #         print("bw", l.bw_weights.size())
+
     @staticmethod
     def _set_random_seed(rnd_seed):
         """
@@ -1524,20 +1553,29 @@ class LESequential(object):
 
     def _update_errors(self, target_error):
         self.errors[-1] = target_error
-        for i, layer in reversed(list(enumerate(self.layers))):
-            # print(f'Udpating error in layer {i}')
-            self.errors[i] = layer.update_weights(self.errors[i + 1], self.with_optimizer)
+        if self.algorithm == 'DFA':
+            self._calc_DFA_errors(self.errors[-1])
+        else:
+            for i, layer in reversed(list(enumerate(self.layers))):
+                self.errors[i] = layer.update_weights(self.errors[i + 1], self.with_optimizer)
+
+    def _calc_DFA_errors(self, target_error):
+        _ = self.layers[-1].update_weights(target_error, self.with_optimizer)
+        for layer, bw_weights in zip(reversed(self.layers[:-1]), reversed(self.layers[-1].all_bw_weights)):
+            if bw_weights == None:
+                continue
+            else:
+                if isinstance(layer, Conv2d):
+                    layer.errors = torch.einsum('ij,jklm->iklm', target_error, bw_weights)
+                    layer.errors = layer.rho_deriv * layer.errors.permute(0, 3, 1, 2)
+                else:
+                    layer.errors = layer.rho_deriv * torch.matmul(target_error, bw_weights)
+                _ = layer.update_weights(layer.errors, self.with_optimizer)
 
     def _update_bw_weights(self):
-        # print('---------------------------')
-        # print('---------------------------')
-        # print("self.noise before updating:", [noise.mean() if noise is not None else noise for noise in self.noise])
-        # print("bw layers to update:", [hasattr(layer, 'bw_weights') for i, layer in list(enumerate(self.layers))[1:]])
         if self.algorithm == 'PAL':
             for i, layer in list(enumerate(self.layers))[1:]:
                 if hasattr(layer, 'bw_weights'):
-                    # print('---------------------------')
-                    # print(f"updating layer {layer}")
                     layer.update_bw_weights(self.rho_HP[i + 1], self.noise[i - 1], self.with_optimizer)
 
     def get_errors(self):
