@@ -405,8 +405,6 @@ if __name__ == '__main__':
 
     if rec_degs:
         logging.info(f'Recording angle of weights after every evaluation: {rec_degs}')
-        weights_time_series = []
-        bw_weights_time_series = []
     if rec_activations or rec_noise:
         logging.info(f'Recording during evaluation after every presentation time: Angle (W.T,B): {rec_degs}, Activations: {rec_activations}, Noise: {rec_noise}')
 
@@ -537,36 +535,23 @@ if __name__ == '__main__':
             logging.info(f"Saving plot of angle between W.T and B to {IMG_NAME}")
             plt.savefig(IMG_NAME)
 
-            # # generate plot of angle between B and W.T
-            # deg_time_series = []
-
-            # for weights, bw_weights in zip(weights_time_series, bw_weights_time_series):
-            #     # for every recorded time step, calculate cos_sim
-            #     # leave out first entry of weights, as it is not used to transport errors
-            #     deg_time_series.append([deg(cos_sim(W.T,B)) for W, B in zip(weights[1:], bw_weights[1:])])
-
-            # ax = plt.figure(figsize=(7,5))
-            # lines = plt.plot(deg_time_series)
-            # labels = ['layer ' + str(i+1) for i in range(len(model.layers))]
-            # plt.legend(lines, labels)
-            # plt.xlabel('Epochs')
-            # plt.ylabel('alignment [deg]')
-            # # plt.legend()
-            # IMG_NAME = PATH_OUTPUT + "deg_time_series.png"
-            # logging.info(f"Saving plot of angle between W.T and B to {IMG_NAME}")
-            # plt.savefig(IMG_NAME)
-
-            # # save weights
-            # with open(PATH_OUTPUT + "weights.pkl", "wb") as output:
-            #     pickle.dump(weights_time_series, output)
-            #     logging.info(f"Saving weights to {output.name}")
-            # with open(PATH_OUTPUT + "bw_weights.pkl", "wb") as output:
-            #     pickle.dump(bw_weights_time_series, output)
-            # #     logging.info(f"Saving backwards weights to {output.name}")
-            # with open(PATH_OUTPUT + "deg_time_series.pkl", "wb") as output:
-            #     pickle.dump(deg_time_series, output)
-            #     logging.info(f"Saving angle between W.T and B to {output.name}")
-
+            # save weights
+            weights_arr = []
+            bw_weights_arr = []
+            for layer in model.layers:
+                if hasattr(layer, 'weights'):
+                    weights_arr.append(layer.weights.detach().cpu().numpy())
+                if hasattr(layer, 'weights_flat'):
+                    # for conv layers
+                    weights_arr.append(layer.weights_flat.T.detach().cpu().numpy())
+                if hasattr(layer, 'bw_weights'):
+                    bw_weights_arr.append(layer.bw_weights.detach().cpu().numpy())                    
+            with open(PATH_OUTPUT + "weights.pkl", "wb") as output:
+                logging.info(f"Saving weights to {output.name}")
+                pickle.dump(weights_arr, output)
+            with open(PATH_OUTPUT + "bw_weights.pkl", "wb") as output:
+                logging.info(f"Saving backwards weights to {output.name}")
+                pickle.dump(bw_weights_arr, output)
 
     
     # evaluate model on test set
