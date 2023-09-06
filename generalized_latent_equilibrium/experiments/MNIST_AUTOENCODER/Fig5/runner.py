@@ -21,7 +21,7 @@ if __name__ == '__main__':
 					default=False,
 					help='Gather results from linear classifier.')
 	parser.add_argument('--algorithm', required=True,
-					help='Choose algorithm: BP, FA or PAL')
+					help='Choose algorithm: BP, FA, DFA or PAL')
 
 
 	args = parser.parse_args()
@@ -68,7 +68,7 @@ if __name__ == '__main__':
 							        "regularizer": [1e-4,1e-4,1e-4,1e-4],
 							        "tau_xi": [10,10,10,10],
 							        "tau_HP": [10,10,10,10],
-							        "tau_LO": [1e+4,1e+4,1e+4,1e+4],
+							        "tau_LO": [0.0,0.0,0.0,0.0],
 							        "sigma": [1e-2,1e-2,1e-2,0]
 							        }
 						        )
