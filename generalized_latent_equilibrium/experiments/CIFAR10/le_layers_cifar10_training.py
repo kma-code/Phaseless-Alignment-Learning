@@ -464,7 +464,7 @@ if __name__ == '__main__':
             if rec_degs and deg_arr is not None:
                 deg_arr.append(deg_WTB)
 
-            test_model(model, test_loader)
+            # test_model(model, test_loader)
 
         logging.basicConfig(format='Train model -- %(levelname)s: %(message)s',
                     level=logging.INFO, force=True)
