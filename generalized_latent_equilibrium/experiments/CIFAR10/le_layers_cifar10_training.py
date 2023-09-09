@@ -506,11 +506,11 @@ if __name__ == '__main__':
             if rec_degs and deg_arr is not None:
                 deg_arr.append(deg_WTB)
 
-            ## after every epoch, save model
-            #
-            #with open(PATH_OUTPUT + 'MLPNet_epoch' + str(epoch+1) + '.pkl', 'wb') as output:
-            #    pickle.dump(model, output, pickle.HIGHEST_PROTOCOL)
-            #    logging.info(f'Saved model to {output.name}')
+        # after training, save model
+        
+        with open(PATH_OUTPUT + 'MLPNet_epoch' + str(epoch+1) + '.pkl', 'wb') as output:
+           pickle.dump(model, output, pickle.HIGHEST_PROTOCOL)
+           logging.info(f'Saved model to {output.name}')
 
         with open(PATH_OUTPUT + "val_acc.pkl", "wb") as output:
             pickle.dump(val_acc, output)
