@@ -471,7 +471,7 @@ if __name__ == '__main__':
     logging.info('Starting training')
 
     # for epoch in tqdm(range(epochs), desc="Epochs"):
-    for epoch in range(epochs):
+    for epoch in range(model.epoch, epochs):
         # training
         correct_cnt, summed_loss = 0, 0
         total_cnt = 0
