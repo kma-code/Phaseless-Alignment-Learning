@@ -446,8 +446,8 @@ if __name__ == '__main__':
 
     # criterion = nn.CrossEntropyLoss()
 
-    val_acc = []
-    deg_arr = []
+    model.val_acc = []
+    model.deg_arr = []
 
     ## save model at init
     #with open(PATH_OUTPUT + 'MLPNet_epoch0.pkl', 'wb') as output:
@@ -459,9 +459,9 @@ if __name__ == '__main__':
     logging.info(f"Target type: {model.target_type}")
     if DEBUG == False:
         val, deg_WTB = validate_model(model, val_loader)
-        val_acc.append(val)
-        if rec_degs and deg_arr is not None:
-            deg_arr.append(deg_WTB)
+        model.val_acc.append(val)
+        if rec_degs and model.deg_arr is not None:
+            model.deg_arr.append(deg_WTB)
 
         # test_model(model, test_loader)
 
@@ -501,9 +501,9 @@ if __name__ == '__main__':
 
         # validate
         val, deg_WTB = validate_model(model, val_loader)
-        val_acc.append(val)
-        if rec_degs and deg_arr is not None:
-            deg_arr.append(deg_WTB)
+        model.val_acc.append(val)
+        if rec_degs and model.deg_arr is not None:
+            model.deg_arr.append(deg_WTB)
 
     # after training, save model
     
@@ -512,23 +512,23 @@ if __name__ == '__main__':
        logging.info(f'Saved model to {output.name}')
 
     with open(PATH_OUTPUT + "val_acc.pkl", "wb") as output:
-        pickle.dump(val_acc, output)
+        pickle.dump(model.val_acc, output)
         logging.info(f"Saving loss to {output.name}")
 
         # plot val loss
         ax = plt.figure(figsize=(7,5))
-        plt.plot(val_acc)
+        plt.plot(model.val_acc)
         IMG_NAME = PATH_OUTPUT + "val_acc.png"
         logging.info(f"Saving plot of validation loss to {IMG_NAME}")
         plt.savefig(IMG_NAME)
 
     if rec_degs:
         with open(PATH_OUTPUT + "deg_arr.pkl", "wb") as output:
-            pickle.dump(deg_arr, output)
+            pickle.dump(model.deg_arr, output)
             logging.info(f"Saving angle between W.T and B to {output.name}")
 
         ax = plt.figure(figsize=(7,5))
-        plt.plot(deg_arr)
+        plt.plot(model.deg_arr)
         plt.xlabel('Epochs')
         plt.ylabel('alignment [deg]')
         # plt.legend()
