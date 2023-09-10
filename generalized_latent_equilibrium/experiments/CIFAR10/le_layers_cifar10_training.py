@@ -410,6 +410,10 @@ if __name__ == '__main__':
     if rec_activations or rec_noise:
         logging.info(f'Recording during evaluation after every presentation time: Angle (W.T,B): {rec_degs}, Activations: {rec_activations}, Noise: {rec_noise}')
 
+    # create output directory if it doesn't exist
+    if not(os.path.exists(PATH_OUTPUT)):
+        logging.info(f"{PATH_OUTPUT} doesn't exists, creating")
+        os.makedirs(PATH_OUTPUT)
 
     # if a model file has been passed, load and do not train
     if args.load:
@@ -438,122 +442,117 @@ if __name__ == '__main__':
             model = LeNet5(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer, wn_sigma=wn_sigma)
         model.epoch = 0
 
-        # optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
+    # optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
 
-        # criterion = nn.CrossEntropyLoss()
+    # criterion = nn.CrossEntropyLoss()
 
-        val_acc = []
-        deg_arr = []
+    val_acc = []
+    deg_arr = []
 
-        # create output directory if it doesn't exist
-        if not(os.path.exists(PATH_OUTPUT)):
-            logging.info(f"{PATH_OUTPUT} doesn't exists, creating")
-            os.makedirs(PATH_OUTPUT)
+    ## save model at init
+    #with open(PATH_OUTPUT + 'MLPNet_epoch0.pkl', 'wb') as output:
+    #            pickle.dump(model, output, pickle.HIGHEST_PROTOCOL)
+    #            logging.info(f'Saved model to {output.name}')
+    # evaluate model on test set
+    logging.info("Evaluating model before training (val+test)")
 
-        ## save model at init
-        #with open(PATH_OUTPUT + 'MLPNet_epoch0.pkl', 'wb') as output:
-        #            pickle.dump(model, output, pickle.HIGHEST_PROTOCOL)
-        #            logging.info(f'Saved model to {output.name}')
-        # evaluate model on test set
-        logging.info("Evaluating model before training (val+test)")
+    logging.info(f"Target type: {model.target_type}")
+    if DEBUG == False:
+        val, deg_WTB = validate_model(model, val_loader)
+        val_acc.append(val)
+        if rec_degs and deg_arr is not None:
+            deg_arr.append(deg_WTB)
 
-        logging.info(f"Target type: {model.target_type}")
-        if DEBUG == False:
-            val, deg_WTB = validate_model(model, val_loader)
-            val_acc.append(val)
-            if rec_degs and deg_arr is not None:
-                deg_arr.append(deg_WTB)
+        # test_model(model, test_loader)
 
-            # test_model(model, test_loader)
+    logging.basicConfig(format='Train model -- %(levelname)s: %(message)s',
+                level=logging.INFO, force=True)
 
-        logging.basicConfig(format='Train model -- %(levelname)s: %(message)s',
-                    level=logging.INFO, force=True)
+    logging.info('Starting training')
 
-        logging.info('Starting training')
+    # for epoch in tqdm(range(epochs), desc="Epochs"):
+    for epoch in range(epochs):
+        # training
+        correct_cnt, summed_loss = 0, 0
+        total_cnt = 0
+        summed_loss = 0
+        model.epoch += 1
+        model.train()
+        for batch_idx, (x, target) in enumerate(tqdm(train_loader, desc="Batches", disable=tqdm_disabled)):
+        # for batch_idx, (x, label) in enumerate(train_loader):
+            # optimizer.zero_grad()
+            if use_cuda:
+                x, target = x.cuda(), target.cuda()
+            # x = x.view(-1, 32 * 32 * 3)
 
-        # for epoch in tqdm(range(epochs), desc="Epochs"):
-        for epoch in range(epochs):
-            # training
-            correct_cnt, summed_loss = 0, 0
-            total_cnt = 0
-            summed_loss = 0
-            model.epoch += 1
-            model.train()
-            for batch_idx, (x, target) in enumerate(tqdm(train_loader, desc="Batches", disable=tqdm_disabled)):
-            # for batch_idx, (x, label) in enumerate(train_loader):
-                # optimizer.zero_grad()
-                if use_cuda:
-                    x, target = x.cuda(), target.cuda()
-                # x = x.view(-1, 32 * 32 * 3)
+            for update_i in range(presentation_steps):
+                model.update(x, target)
 
-                for update_i in range(presentation_steps):
-                    model.update(x, target)
+            loss = model.errors[-1]
+            out = model.rho[-1]
+            _, pred_label = torch.max(out, 1)
+            total_cnt += x.shape[0]
+            correct_cnt += (pred_label == torch.max(target, 1)[1]).sum()
+            summed_loss += loss.detach().cpu().numpy()
+            # loss.backward()
+            # optimizer.step()
+            if (batch_idx + 1) % 100 == 0 or (batch_idx + 1) == len(train_loader):
+                logging.info(f'Epoch: {epoch+1}, batch index: {batch_idx + 1}, train loss: {(np.abs(summed_loss).sum(1)/total_cnt).mean(0):.9f}')
 
-                loss = model.errors[-1]
-                out = model.rho[-1]
-                _, pred_label = torch.max(out, 1)
-                total_cnt += x.shape[0]
-                correct_cnt += (pred_label == torch.max(target, 1)[1]).sum()
-                summed_loss += loss.detach().cpu().numpy()
-                # loss.backward()
-                # optimizer.step()
-                if (batch_idx + 1) % 100 == 0 or (batch_idx + 1) == len(train_loader):
-                    logging.info(f'Epoch: {epoch+1}, batch index: {batch_idx + 1}, train loss: {(np.abs(summed_loss).sum(1)/total_cnt).mean(0):.9f}')
+        # validate
+        val, deg_WTB = validate_model(model, val_loader)
+        val_acc.append(val)
+        if rec_degs and deg_arr is not None:
+            deg_arr.append(deg_WTB)
 
-            # validate
-            val, deg_WTB = validate_model(model, val_loader)
-            val_acc.append(val)
-            if rec_degs and deg_arr is not None:
-                deg_arr.append(deg_WTB)
+    # after training, save model
+    
+    with open(PATH_OUTPUT + 'MLPNet_epoch' + str(epoch+1) + '.pkl', 'wb') as output:
+       pickle.dump(model, output, pickle.HIGHEST_PROTOCOL)
+       logging.info(f'Saved model to {output.name}')
 
-        # after training, save model
-        
-        with open(PATH_OUTPUT + 'MLPNet_epoch' + str(epoch+1) + '.pkl', 'wb') as output:
-           pickle.dump(model, output, pickle.HIGHEST_PROTOCOL)
-           logging.info(f'Saved model to {output.name}')
+    with open(PATH_OUTPUT + "val_acc.pkl", "wb") as output:
+        pickle.dump(val_acc, output)
+        logging.info(f"Saving loss to {output.name}")
 
-        with open(PATH_OUTPUT + "val_acc.pkl", "wb") as output:
-            pickle.dump(val_acc, output)
-            logging.info(f"Saving loss to {output.name}")
+        # plot val loss
+        ax = plt.figure(figsize=(7,5))
+        plt.plot(val_acc)
+        IMG_NAME = PATH_OUTPUT + "val_acc.png"
+        logging.info(f"Saving plot of validation loss to {IMG_NAME}")
+        plt.savefig(IMG_NAME)
 
-            # plot val loss
-            ax = plt.figure(figsize=(7,5))
-            plt.plot(val_acc)
-            IMG_NAME = PATH_OUTPUT + "val_acc.png"
-            logging.info(f"Saving plot of validation loss to {IMG_NAME}")
-            plt.savefig(IMG_NAME)
+    if rec_degs:
+        with open(PATH_OUTPUT + "deg_arr.pkl", "wb") as output:
+            pickle.dump(deg_arr, output)
+            logging.info(f"Saving angle between W.T and B to {output.name}")
 
-        if rec_degs:
-            with open(PATH_OUTPUT + "deg_arr.pkl", "wb") as output:
-                pickle.dump(deg_arr, output)
-                logging.info(f"Saving angle between W.T and B to {output.name}")
+        ax = plt.figure(figsize=(7,5))
+        plt.plot(deg_arr)
+        plt.xlabel('Epochs')
+        plt.ylabel('alignment [deg]')
+        # plt.legend()
+        IMG_NAME = PATH_OUTPUT + "deg_WTB.png"
+        logging.info(f"Saving plot of angle between W.T and B to {IMG_NAME}")
+        plt.savefig(IMG_NAME)
 
-            ax = plt.figure(figsize=(7,5))
-            plt.plot(deg_arr)
-            plt.xlabel('Epochs')
-            plt.ylabel('alignment [deg]')
-            # plt.legend()
-            IMG_NAME = PATH_OUTPUT + "deg_WTB.png"
-            logging.info(f"Saving plot of angle between W.T and B to {IMG_NAME}")
-            plt.savefig(IMG_NAME)
-
-            # save weights
-            weights_arr = []
-            bw_weights_arr = []
-            for layer in model.layers:
-                if hasattr(layer, 'weights'):
-                    weights_arr.append(layer.weights.detach().cpu().numpy())
-                if hasattr(layer, 'weights_flat'):
-                    # for conv layers
-                    weights_arr.append(layer.weights_flat.T.detach().cpu().numpy())
-                if hasattr(layer, 'bw_weights'):
-                    bw_weights_arr.append(layer.bw_weights.detach().cpu().numpy())                    
-            with open(PATH_OUTPUT + "weights.pkl", "wb") as output:
-                logging.info(f"Saving weights to {output.name}")
-                pickle.dump(weights_arr, output)
-            with open(PATH_OUTPUT + "bw_weights.pkl", "wb") as output:
-                logging.info(f"Saving backwards weights to {output.name}")
-                pickle.dump(bw_weights_arr, output)
+        # save weights
+        weights_arr = []
+        bw_weights_arr = []
+        for layer in model.layers:
+            if hasattr(layer, 'weights'):
+                weights_arr.append(layer.weights.detach().cpu().numpy())
+            if hasattr(layer, 'weights_flat'):
+                # for conv layers
+                weights_arr.append(layer.weights_flat.T.detach().cpu().numpy())
+            if hasattr(layer, 'bw_weights'):
+                bw_weights_arr.append(layer.bw_weights.detach().cpu().numpy())                    
+        with open(PATH_OUTPUT + "weights.pkl", "wb") as output:
+            logging.info(f"Saving weights to {output.name}")
+            pickle.dump(weights_arr, output)
+        with open(PATH_OUTPUT + "bw_weights.pkl", "wb") as output:
+            logging.info(f"Saving backwards weights to {output.name}")
+            pickle.dump(bw_weights_arr, output)
 
     
     # evaluate model on test set
