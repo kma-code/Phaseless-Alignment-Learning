@@ -195,6 +195,15 @@ def validate_model(model, val_loader):
                 logging.info(f'Size of W: {float("{:.3f}".format(W.mean()))} +- {float("{:.3f}".format(W.std()))}, max {float("{:.3f}".format(W.max()))}')
                 logging.info(f'Size of B: {float("{:.3f}".format(B.mean()))} +- {float("{:.3f}".format(B.std()))}, max {float("{:.3f}".format(B.max()))}')
 
+    elif model.algorithm == 'BP':
+        for layer in model.layers:
+            if hasattr(layer, 'weights'):
+                W = layer.weights.detach().cpu().numpy()
+            if hasattr(layer, 'weights_flat'):
+                # for conv layers
+                W = layer.weights_flat.T.detach().cpu().numpy()
+            logging.info(f'Size of W: {float("{:.3f}".format(W.mean()))} +- {float("{:.3f}".format(W.std()))}, max {float("{:.3f}".format(W.max()))}')
+
     else:
         deg_WTB = None
 
