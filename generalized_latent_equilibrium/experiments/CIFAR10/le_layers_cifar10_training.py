@@ -203,7 +203,7 @@ def validate_model(model, val_loader):
                 # for conv layers
                 W = layer.weights_flat.T.detach().cpu().numpy()
             logging.info(f'Size of W: {float("{:.3f}".format(W.mean()))} +- {float("{:.3f}".format(W.std()))}, max {float("{:.3f}".format(W.max()))}')
-
+            deg_WTB = None
     else:
         deg_WTB = None
 
