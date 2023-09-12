@@ -142,6 +142,8 @@ def validate_model(model, val_loader):
         bw_weights_arr = [layer.bw_weights.detach().cpu().numpy() for layer in model.layers] if rec_weights else None
     elif model.algorithm == 'BP':
         bw_weights_arr = [layer.weights.t().detach().cpu().numpy() for layer in model.layers] if rec_weights else None
+    elif mode.algorithm == 'DFA':
+        bw_weights_arr = None
 
     return np.abs(summed_error)/total_cnt, weights_arr, bw_weights_arr
 
