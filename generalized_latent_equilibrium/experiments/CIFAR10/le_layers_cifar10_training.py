@@ -34,6 +34,7 @@ import matplotlib.gridspec as gridspec
 from matplotlib.ticker import FormatStrFormatter
 colors = ["r","g","b","black","yellow","gray","pink","cyan","magenta","lightblue"]
 
+import time
 
 # give this to each dataloader
 def dataloader_seed_worker(worker_id):
@@ -244,6 +245,7 @@ def test_model(model, test_loader):
 
 
 if __name__ == '__main__':
+    t0 = time.time()
 
     # path to folder of this file
     PATH_SCRIPT = os.path.dirname(os.path.realpath(__file__))
@@ -392,12 +394,12 @@ if __name__ == '__main__':
     # cut down training and test sets for debugging
     indices = torch.arange(512)
     train_set = data_utils.Subset(train_set, indices)
-    indices = torch.arange(64)
+    indices = torch.arange(128)
     test_set = data_utils.Subset(test_set, indices)
 
     classes = classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
 
-    val_size = 32 #10_000
+    val_size = 128 #10_000
     train_size = len(train_set) - val_size
 
     train_set, val_set = random_split(train_set, [train_size, val_size], generator=torch.Generator().manual_seed(seed))
@@ -567,3 +569,4 @@ if __name__ == '__main__':
     # evaluate model on test set
     test_model(model, test_loader)
 
+    print("Total execution time:", time.time() - t0, "s")

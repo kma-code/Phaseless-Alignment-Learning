@@ -288,7 +288,7 @@ class Conv2d_PAL(Conv2d):
         self.basal_inputs = self.basal_inputs.reshape(self.batch_size, self.num_filters, self.target_size, self.target_size) + self.biases.reshape(1, -1, 1, 1)
 
         # calculate new noise
-        self.noise = self._update_OU_noise(self.noise)
+        #self.noise = self._update_OU_noise(self.noise)
         self.noise = self.noise.reshape(self.batch_size, self.num_filters, self.target_size, self.target_size)
         # voltage is basal + error + OU-noise + white noise
         self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + self.errors + self.noise + self.wn_sigma * torch.randn(self.voltages.size(), device=self.device))
@@ -419,6 +419,7 @@ class Conv2d_PAL(Conv2d):
 
 
     def update_bw_weights(self, rho_HP, noise, with_optimizer=False):
+        pass
 
         if self.train_B:
 
@@ -830,7 +831,7 @@ class Projection_PAL(Projection):
         self.basal_inputs = torch.matmul(rho, self.weights) + self.biases
 
         # calculate new noise
-        self.noise = self._update_OU_noise(self.noise)
+        #self.noise = self._update_OU_noise(self.noise)
         # voltage is basal + error + OU-noise + white noise
         self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + self.errors + self.noise + self.wn_sigma * torch.randn(self.voltages.size(), device=self.device))
         self.voltage_lookaheads = self.voltages + self.tau * self.voltages_deriv
@@ -933,6 +934,7 @@ class Projection_PAL(Projection):
         return self.rho_HP
 
     def update_bw_weights(self, rho_HP, noise, with_optimizer=False):
+        pass
 
         if self.train_B:
 
@@ -1215,7 +1217,7 @@ class Linear_PAL(Linear):
         self.basal_inputs = torch.matmul(rho, self.weights) + self.biases
 
         # calculate new noise
-        self.noise = self._update_OU_noise(self.noise)
+        #self.noise = self._update_OU_noise(self.noise)
         # voltage is basal + error + OU-noise + white noise
         self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + self.errors + self.noise + self.wn_sigma * torch.randn(self.voltages.size(), device=self.device))
         self.voltage_lookaheads = self.voltages + self.tau * self.voltages_deriv
@@ -1317,6 +1319,7 @@ class Linear_PAL(Linear):
         return self.rho_HP
 
     def update_bw_weights(self, rho_HP, noise, with_optimizer=False):
+        pass
 
         if self.train_B:
 
@@ -1550,8 +1553,8 @@ class LESequential(object):
 
             self._update_errors(target_error)
 
-            if self.algorithm == 'PAL':
-                self._update_bw_weights()
+            #if self.algorithm == 'PAL':
+            #    self._update_bw_weights()
 
 
     def _update_errors(self, target_error):
