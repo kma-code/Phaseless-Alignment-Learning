@@ -369,7 +369,7 @@ class Conv2d_PAL(Conv2d):
         """
 
         # sample new noise and low-pass filter
-        temp_noise = torch.empty(noise.size()).normal_(mean=0.0, std=1.0).to(self.device)
+        temp_noise = torch.empty(noise.size(), device=self.device).normal_(mean=0.0, std=1.0)
         noise += 1/self.tau_xi * (np.sqrt(self.tau_xi * self.dt) * self.sigma * temp_noise - self.dt * noise)
         # noise += 1/self.tau_xi * (np.sqrt(self.tau_xi * self.dt) * self.sigma * torch.randn(noise.size(), device=self.device) - self.dt * noise)
 
@@ -905,7 +905,7 @@ class Projection_PAL(Projection):
         """
 
         # sample new noise and low-pass filter
-        temp_noise = torch.empty(noise.size()).normal_(mean=0.0, std=1.0).to(self.device)
+        temp_noise = torch.empty(noise.size(), device=self.device).normal_(mean=0.0, std=1.0)
         noise += 1/self.tau_xi * (np.sqrt(self.tau_xi * self.dt) * self.sigma * temp_noise - self.dt * noise)
         # noise += 1/self.tau_xi * (np.sqrt(self.tau_xi * self.dt) * self.sigma * torch.randn(noise.size(), device=self.device) - self.dt * noise)
 
@@ -1288,7 +1288,7 @@ class Linear_PAL(Linear):
         """
 
         # sample new noise and low-pass filter
-        temp_noise = torch.empty(noise.size()).normal_(mean=0.0, std=1.0).to(self.device)
+        temp_noise = torch.empty(noise.size(), device=self.device).normal_(mean=0.0, std=1.0)
         noise += 1/self.tau_xi * (np.sqrt(self.tau_xi * self.dt) * self.sigma * temp_noise - self.dt * noise)
         # noise += 1/self.tau_xi * (np.sqrt(self.tau_xi * self.dt) * self.sigma * torch.randn(noise.size(), device=self.device) - self.dt * noise)
 
