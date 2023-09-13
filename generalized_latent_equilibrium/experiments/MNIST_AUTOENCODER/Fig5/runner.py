@@ -44,8 +44,8 @@ if __name__ == '__main__':
 	params_arr = []
 	for i in [-3, -2]:
 		for j in [-3, -2]:
-			for k in [-3, -2]:
-				for l in [-3, -2]:
+			for k in [-3]:
+				for l in [-3]:
 					params_per_lr = []
 					for seed in seeds:
 						params = {

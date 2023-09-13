@@ -414,7 +414,8 @@ class Conv2d_PAL(Conv2d):
         # print(f"einsum {(torch.einsum('bif,bjf->bfij', rho_HP_flat, noise_flat)).mean(0).mean(0).size()}")
 
         # dB = (torch.einsum('bif,bjf->bfij', rho_HP_flat, noise_flat)).mean(0).mean(0)
-        return (torch.einsum('bif,bjf->ij', rho_HP_flat, noise_flat))/self.batch_size - self.regularizer * self.bw_weights
+        # return (torch.einsum('bif,bjf->ij', rho_HP_flat, noise_flat))/self.batch_size - self.regularizer * self.bw_weights
+        return  - self.regularizer * self.bw_weights
 
 
     def update_bw_weights(self, rho_HP, noise, with_optimizer=False):
@@ -956,7 +957,8 @@ class Projection_PAL(Projection):
         # print(f"rho_HP in get_bw_weight_derivatives: {rho_HP.mean()}, {rho_HP.size()}")
         # print(f"noise in get_bw_weight_derivatives: {noise.mean() if noise is not None else noise}, {noise.reshape(self.batch_size, self.Hid).size()}")
         # print("bw_weights:", self.bw_weights.size())
-        return (torch.einsum('bi,bj->ij', rho_HP, noise.reshape(self.batch_size, self.Hid)))/self.batch_size - self.regularizer * self.bw_weights
+        # return (torch.einsum('bi,bj->ij', rho_HP, noise.reshape(self.batch_size, self.Hid)))/self.batch_size - self.regularizer * self.bw_weights
+        return - self.regularizer * self.bw_weights
 
     def get_PAL_parameters(self):
         param_dict = {"learning_rate_bw": self.learning_rate_B,
@@ -1335,7 +1337,8 @@ class Linear_PAL(Linear):
             weight_derivative: noise * r_HP^T
 
         """
-        return (torch.einsum('bi,bj->ij', rho_HP, noise))/self.batch_size - self.regularizer * self.bw_weights
+        # return (torch.einsum('bi,bj->ij', rho_HP, noise))/self.batch_size - self.regularizer * self.bw_weights
+        return  - self.regularizer * self.bw_weights
 
     def get_PAL_parameters(self):
         param_dict = {"learning_rate_bw": self.learning_rate_B,
