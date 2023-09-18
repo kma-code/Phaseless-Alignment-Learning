@@ -450,6 +450,7 @@ if __name__ == '__main__':
 
             model.epoch = old_model.epoch
             model.update_parameters(old_model.list_parameters())
+            logging.info(f"Copied weights and biases from loaded model")
 
         else:
             model = old_model
