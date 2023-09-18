@@ -278,6 +278,8 @@ if __name__ == '__main__':
     parser.add_argument('--rec_noise', default=False, action='store_true', help="Record injected noise (PAL only)")
     # whether to test and validate before training
     parser.add_argument('--debug', default=False, action='store_true', help="Disable testing and validation before training")
+    # whether to re-init model after loading 
+    parser.add_argument('--reload', default=False, action='store_true', help="Re-initialize model with new parameters after loading")
 
 
     args = parser.parse_args()
@@ -348,6 +350,7 @@ if __name__ == '__main__':
         rec_noise = args.rec_noise
     
     DEBUG = args.debug
+    RELOAD = args.reload
 
     with_optimizer = False
 
@@ -428,14 +431,28 @@ if __name__ == '__main__':
     if args.load:
         with open(args.load, 'rb') as input:
             if use_cuda  == False:
-                model = CPU_Unpickler(input).load()
+                old_model = CPU_Unpickler(input).load()
                 # we also need to set all device variables to cpu
-                for layer in model.layers:
+                for layer in old_model.layers:
                     layer.device = 'cpu'
-                model.device = 'cpu'
+                old_model.device = 'cpu'
             else:
-                model = pickle.load(input)
+                old_model = pickle.load(input)
             logging.info(f"Loaded model {args.load}")
+
+        if RELOAD:
+
+            if algorithm == 'PAL':
+                model = LeNet5(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer,
+                               bw_lr_factors = bw_lr_factors, regularizer = regularizer, tau_xi = tau_xi, tau_HP = tau_HP, tau_LO = tau_LO, sigma = sigma, wn_sigma = wn_sigma)
+            else:
+                model = LeNet5(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer, wn_sigma=wn_sigma)
+
+            model.epoch = old_model.epoch
+            model.update_parameters(old_model.list_parameters())
+
+        else:
+            model = old_model
 
     else:
 

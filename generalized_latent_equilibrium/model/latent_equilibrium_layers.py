@@ -225,6 +225,9 @@ class Conv2d(object):
     def parameters(self):
         return [self.kernel, self.biases]
 
+    def update_parameters(self, new_params):
+        self.kernel, self.biases = new_params[0], new_params[1]
+
 class Conv2d_PAL(Conv2d):
     """
         This class inherits all properties from the parent class 'conv2d' and adds the function to add noise
@@ -547,6 +550,9 @@ class MaxPool2d(object):
     def parameters(self):
         return []
 
+    def update_parameters(self, new_params):
+        pass
+
 
 class AvgPool2d(object):
     # These are not really neurons...
@@ -769,6 +775,9 @@ class Projection(object):
 
     def parameters(self):
         return [self.weights, self.biases]
+
+    def update_parameters(self, new_params):
+        self.weights, self.biases = new_params[0], new_params[1]
 
 
 class Projection_PAL(Projection):
@@ -1154,6 +1163,9 @@ class Linear(object):
 
     def parameters(self):
         return [self.weights, self.biases]
+
+    def update_parameters(self, new_params):
+        self.weights, self.biases = new_params[0], new_params[1]
 
 
 class Linear_PAL(Linear):
@@ -1751,3 +1763,14 @@ class LESequential(object):
         params = []
         list(map(params.extend, [l.parameters() for l in self.layers]))
         return params
+
+    def list_parameters(self):
+        params_arr = []
+        for l in self.layers:
+            params_arr.append(l.parameters())
+        return params_arr
+
+    def update_parameters(self, new_params):
+        for l, new_p in zip(self.layers, new_params):
+            l.update_parameters(new_p)
+
