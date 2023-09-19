@@ -476,6 +476,25 @@ if __name__ == '__main__':
     model.val_acc = []
     model.deg_arr = []
 
+    if rec_degs:
+        # save weights
+        weights_arr = []
+        bw_weights_arr = []
+        for layer in model.layers:
+            if hasattr(layer, 'weights'):
+                weights_arr.append(layer.weights.detach().cpu().numpy())
+            if hasattr(layer, 'weights_flat'):
+                # for conv layers
+                weights_arr.append(layer.weights_flat.T.detach().cpu().numpy())
+            if hasattr(layer, 'bw_weights'):
+                bw_weights_arr.append(layer.bw_weights.detach().cpu().numpy())                    
+        with open(PATH_OUTPUT + "weights_epoch" + str(model.epoch) + ".pkl", "wb") as output:
+            logging.info(f"Saving weights to {output.name}")
+            pickle.dump(weights_arr, output)
+        with open(PATH_OUTPUT + "bw_weights_epoch" + str(model.epoch) + ".pkl", "wb") as output:
+            logging.info(f"Saving backwards weights to {output.name}")
+            pickle.dump(bw_weights_arr, output)
+
     ## save model at init
     #with open(PATH_OUTPUT + 'MLPNet_epoch0.pkl', 'wb') as output:
     #            pickle.dump(model, output, pickle.HIGHEST_PROTOCOL)
@@ -574,10 +593,10 @@ if __name__ == '__main__':
                 weights_arr.append(layer.weights_flat.T.detach().cpu().numpy())
             if hasattr(layer, 'bw_weights'):
                 bw_weights_arr.append(layer.bw_weights.detach().cpu().numpy())                    
-        with open(PATH_OUTPUT + "weights.pkl", "wb") as output:
+        with open(PATH_OUTPUT + "weights_epoch" + str(model.epoch) + ".pkl", "wb") as output:
             logging.info(f"Saving weights to {output.name}")
             pickle.dump(weights_arr, output)
-        with open(PATH_OUTPUT + "bw_weights.pkl", "wb") as output:
+        with open(PATH_OUTPUT + "bw_weights_epoch" + str(model.epoch) + ".pkl", "wb") as output:
             logging.info(f"Saving backwards weights to {output.name}")
             pickle.dump(bw_weights_arr, output)
 
