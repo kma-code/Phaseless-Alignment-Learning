@@ -145,6 +145,8 @@ def validate_model(model, val_loader):
     total_cnt = 0
     val_accuracies = []
     model.eval()
+    model.disable_OU_noise()
+
     for batch_idx, (x, target) in enumerate(val_loader):
         if use_cuda:
             x, target = x.cuda(), target.cuda()
@@ -163,6 +165,17 @@ def validate_model(model, val_loader):
         total_cnt += x.shape[0]
         correct_cnt += (pred_label == torch.max(target, 1)[1]).sum()
         summed_loss  += loss.detach().cpu().numpy()
+
+        for layer in model.layers:
+            if not hasattr(layer, 'PASS_LAYER'):
+                if hasattr(layer, 'weights'):
+                    W = layer.weights.detach().cpu().numpy()
+                if hasattr(layer, 'weights_flat'):
+                    # for conv layers
+                    W = layer.weights_flat.T.detach().cpu().numpy()
+                # print(f"layer {layer}", W.shape)
+                print(f"layer {layer}", layer.rho.mean())
+        raise ValueError
 
         if (batch_idx + 1) % 100 == 0 or (batch_idx + 1) == len(val_loader):
             if model.epoch == 0:
@@ -206,6 +219,8 @@ def validate_model(model, val_loader):
             deg_WTB = None
     else:
         deg_WTB = None
+
+    model.enable_OU_noise()
 
     return (correct_cnt/total_cnt).detach().cpu().numpy(), deg_WTB
 
@@ -392,15 +407,15 @@ if __name__ == '__main__':
     # if not existing, download mnist dataset
     train_set = datasets.CIFAR10(root=PATH_SCRIPT + '/cifar10_data', train=True, transform=transform, target_transform=target_transform,download=True)
     test_set  = datasets.CIFAR10(root=PATH_SCRIPT + '/cifar10_data', train=False, transform=transform, target_transform=target_transform,download=True)
-    # # cut down training and test sets for debugging
-    # indices = torch.arange(128)
-    # train_set = data_utils.Subset(train_set, indices)
-    # indices = torch.arange(64)
-    # test_set = data_utils.Subset(test_set, indices)
+    # cut down training and test sets for debugging
+    indices = torch.arange(128)
+    train_set = data_utils.Subset(train_set, indices)
+    indices = torch.arange(64)
+    test_set = data_utils.Subset(test_set, indices)
 
     classes = classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
 
-    val_size = 10_000
+    val_size = 32
     train_size = len(train_set) - val_size
 
     train_set, val_set = random_split(train_set, [train_size, val_size], generator=torch.Generator().manual_seed(seed))
@@ -516,6 +531,8 @@ if __name__ == '__main__':
 
     logging.info('Starting training')
 
+    train_accuracies = []
+
     # for epoch in tqdm(range(epochs), desc="Epochs"):
     for epoch in range(model.epoch, epochs):
         # training
@@ -543,7 +560,9 @@ if __name__ == '__main__':
             # loss.backward()
             # optimizer.step()
             if (batch_idx + 1) % 100 == 0 or (batch_idx + 1) == len(train_loader):
-                logging.info(f'Epoch: {epoch+1}, batch index: {batch_idx + 1}, train loss: {(np.abs(summed_loss).sum(1)/total_cnt).mean(0):.9f}')
+                logging.info(f'Epoch: {epoch+1}, batch index: {batch_idx + 1}, train loss: {(np.abs(summed_loss).sum(1)/total_cnt).mean(0):.9f}, train acc:  {correct_cnt/total_cnt:.9f}')
+        
+        train_accuracies.append((correct_cnt / total_cnt).cpu().numpy())
 
         # validate
         val, deg_WTB = validate_model(model, val_loader)
@@ -557,9 +576,13 @@ if __name__ == '__main__':
        pickle.dump(model, output, pickle.HIGHEST_PROTOCOL)
        logging.info(f'Saved model to {output.name}')
 
+    with open(PATH_OUTPUT + "train_acc.pkl", "wb") as output:
+        pickle.dump(train_accuracies, output)
+        logging.info(f"Saving train accuracies to {output.name}")
+
     with open(PATH_OUTPUT + "val_acc.pkl", "wb") as output:
         pickle.dump(model.val_acc, output)
-        logging.info(f"Saving loss to {output.name}")
+        logging.info(f"Saving val accuracies to {output.name}")
 
         # plot val loss
         ax = plt.figure(figsize=(7,5))

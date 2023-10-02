@@ -515,13 +515,8 @@ class MaxPool2d(object):
         # noise is taken from layer below
         if noise is not None:
             noise_out = self._maxpool2d_with_indices(noise, self.idxs_rho)
-        # rho_HP comes from layer above
-        # due to ordering of calcualtions, this could be none even for PAL
-        # at first evaluation
-        if rho_HP is not None:
-            rho_HP_out = F.max_unpool2d(rho_HP, self.idxs_rho, self.kernel_size)
-        else:
-            rho_HP_out = torch.zeros_like(rho_out)
+        # rho_HP is not needed for learning in our case
+        rho_HP_out = None
 
         if self.algorithm in ['BP', 'FA', 'DFA']:
             return rho_out, rho_deriv_out
@@ -1478,6 +1473,13 @@ class LESequential(object):
 
         for l in self.layers:
             l.eval()
+
+    def disable_OU_noise(self):
+        """
+        Disables injection of OU noise
+        """
+        for layer in self.layers:
+            of hasattr(layer, 'XXX')
 
     def update(self, inputs, targets):
         """Performs an update step to the following equations defining the ODE of the neural network dynamics:
