@@ -156,9 +156,6 @@ def validate_model(model, val_loader):
             model.update(x, target)
 
         out = model.rho[-1]
-        # print("x", x.size())
-        # print("out", out.size())
-        # print("target", target.size())
 
         loss = model.errors[-1]
         _, pred_label = torch.max(out, 1)
@@ -166,16 +163,6 @@ def validate_model(model, val_loader):
         correct_cnt += (pred_label == torch.max(target, 1)[1]).sum()
         summed_loss  += loss.detach().cpu().numpy()
 
-        for layer in model.layers:
-            if not hasattr(layer, 'PASS_LAYER'):
-                if hasattr(layer, 'weights'):
-                    W = layer.weights.detach().cpu().numpy()
-                if hasattr(layer, 'weights_flat'):
-                    # for conv layers
-                    W = layer.weights_flat.T.detach().cpu().numpy()
-                # print(f"layer {layer}", W.shape)
-                print(f"layer {layer}", layer.rho.mean())
-        raise ValueError
 
         if (batch_idx + 1) % 100 == 0 or (batch_idx + 1) == len(val_loader):
             if model.epoch == 0:
@@ -237,6 +224,7 @@ def test_model(model, test_loader):
     summed_loss = 0
     total_cnt = 0
     model.eval()
+    model.disable_OU_noise()
 
     for batch_idx, (x, target) in enumerate(test_loader):
         # # we need to flatten images
@@ -256,6 +244,10 @@ def test_model(model, test_loader):
 
         if (batch_idx + 1) % 100 == 0 or (batch_idx + 1) == len(test_loader):
             logging.info(f'Epochs trained: {model.epoch}, batch index: {batch_idx + 1}, test loss:  {correct_cnt/total_cnt:.9f}')
+
+    model.enable_OU_noise()
+
+    return (correct_cnt/total_cnt).detach().cpu().numpy()
 
 
 if __name__ == '__main__':
@@ -407,15 +399,15 @@ if __name__ == '__main__':
     # if not existing, download mnist dataset
     train_set = datasets.CIFAR10(root=PATH_SCRIPT + '/cifar10_data', train=True, transform=transform, target_transform=target_transform,download=True)
     test_set  = datasets.CIFAR10(root=PATH_SCRIPT + '/cifar10_data', train=False, transform=transform, target_transform=target_transform,download=True)
-    # cut down training and test sets for debugging
-    indices = torch.arange(128)
-    train_set = data_utils.Subset(train_set, indices)
-    indices = torch.arange(64)
-    test_set = data_utils.Subset(test_set, indices)
+    # # cut down training and test sets for debugging
+    # indices = torch.arange(128)
+    # train_set = data_utils.Subset(train_set, indices)
+    # indices = torch.arange(64)
+    # test_set = data_utils.Subset(test_set, indices)
 
     classes = classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
 
-    val_size = 32
+    val_size = 10_000
     train_size = len(train_set) - val_size
 
     train_set, val_set = random_split(train_set, [train_size, val_size], generator=torch.Generator().manual_seed(seed))
@@ -625,5 +617,9 @@ if __name__ == '__main__':
 
     
     # evaluate model on test set
-    test_model(model, test_loader)
+    test_acc = test_model(model, test_loader)
+
+    with open(PATH_OUTPUT + "test_acc.pkl", "wb") as output:
+        pickle.dump(test_acc, output)
+        logging.info(f"Saving test accuracies to {output.name}")
 
