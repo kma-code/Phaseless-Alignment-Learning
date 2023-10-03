@@ -16,6 +16,8 @@ from model.layered_torch_utils import set_tensor
 from model.network_params import ModelVariant, TargetType
 from utils.torch_utils import SimpleDataset
 
+import logging
+
 # give this to each dataloader
 def dataloader_seed_worker(worker_id):
     worker_seed = torch.initial_seed() % 2**32
@@ -250,6 +252,8 @@ class Conv2d_PAL(Conv2d):
         self.learning_rate_B = learning_rate_bw
         self.regularizer = regularizer
 
+        self.disable_OU_noise = False
+
         self.tau_xi = tau_xi    # time constant of OU noise
         self.tau_HP = tau_HP    # time constant of high-pass filter
         self.tau_LO = tau_LO    # time constant of low-pass filter
@@ -280,7 +284,6 @@ class Conv2d_PAL(Conv2d):
         self.train_B = False
 
     def forward(self, rho, rho_deriv):
-        # print("testing rho:", rho.size())
         self.rho_input = rho.clone()
         self.rho_flat = self.unfold(rho.clone())
         self.weights_flat = self.kernel.reshape(self.num_filters, -1)
@@ -294,7 +297,10 @@ class Conv2d_PAL(Conv2d):
         self.noise = self._update_OU_noise(self.noise)
         self.noise = self.noise.reshape(self.batch_size, self.num_filters, self.target_size, self.target_size)
         # voltage is basal + error + OU-noise + white noise
-        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + self.errors + self.noise + self.wn_sigma * torch.randn(self.voltages.size(), device=self.device))
+        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + self.errors + self.wn_sigma * torch.randn(self.voltages.size(), device=self.device))
+        if not self.disable_OU_noise:
+            self.voltages_deriv += 1.0 / self.tau * self.noise
+            # print("adding noise", self.noise.mean(), self.voltage_lookaheads.mean())
         self.voltage_lookaheads = self.voltages + self.tau * self.voltages_deriv
         self.voltages = self.voltages + self.dt * self.voltages_deriv
 
@@ -515,13 +521,8 @@ class MaxPool2d(object):
         # noise is taken from layer below
         if noise is not None:
             noise_out = self._maxpool2d_with_indices(noise, self.idxs_rho)
-        # rho_HP comes from layer above
-        # due to ordering of calcualtions, this could be none even for PAL
-        # at first evaluation
-        if rho_HP is not None:
-            rho_HP_out = F.max_unpool2d(rho_HP, self.idxs_rho, self.kernel_size)
-        else:
-            rho_HP_out = torch.zeros_like(rho_out)
+        # rho_HP is not needed for learning in our case
+        rho_HP_out = None
 
         if self.algorithm in ['BP', 'FA', 'DFA']:
             return rho_out, rho_deriv_out
@@ -802,6 +803,8 @@ class Projection_PAL(Projection):
         self.learning_rate_B = learning_rate_bw
         self.regularizer = regularizer
 
+        self.disable_OU_noise = False
+
         self.tau_xi = tau_xi    # time constant of OU noise
         self.tau_HP = tau_HP    # time constant of high-pass filter
         self.tau_LO = tau_LO    # time constant of low-pass filter
@@ -840,7 +843,9 @@ class Projection_PAL(Projection):
         # calculate new noise
         self.noise = self._update_OU_noise(self.noise)
         # voltage is basal + error + OU-noise + white noise
-        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + self.errors + self.noise + self.wn_sigma * torch.randn(self.voltages.size(), device=self.device))
+        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + self.errors + self.wn_sigma * torch.randn(self.voltages.size(), device=self.device))
+        if not self.disable_OU_noise:
+            self.voltages_deriv += 1.0 / self.tau *  self.noise
         self.voltage_lookaheads = self.voltages + self.tau * self.voltages_deriv
         self.voltages = self.voltages + self.dt * self.voltages_deriv
 
@@ -1190,6 +1195,8 @@ class Linear_PAL(Linear):
         self.learning_rate_B = learning_rate_bw
         self.regularizer = regularizer
 
+        self.disable_OU_noise = False
+
         self.tau_xi = tau_xi    # time constant of OU noise
         self.tau_HP = tau_HP    # time constant of high-pass filter
         self.tau_LO = tau_LO    # time constant of low-pass filter
@@ -1227,7 +1234,9 @@ class Linear_PAL(Linear):
         # calculate new noise
         self.noise = self._update_OU_noise(self.noise)
         # voltage is basal + error + OU-noise + white noise
-        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + self.errors + self.noise + self.wn_sigma * torch.randn(self.voltages.size(), device=self.device))
+        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + self.errors + self.wn_sigma * torch.randn(self.voltages.size(), device=self.device))
+        if not self.disable_OU_noise:
+            self.voltages_deriv += 1.0 / self.tau * self.noise
         self.voltage_lookaheads = self.voltages + self.tau * self.voltages_deriv
         self.voltages = self.voltages + self.dt * self.voltages_deriv
 
@@ -1478,6 +1487,28 @@ class LESequential(object):
 
         for l in self.layers:
             l.eval()
+
+    def disable_OU_noise(self):
+        """
+        Disables injection of OU noise
+        """
+
+        logging.info("Disabling OU noise modelling")
+        for layer in self.layers:
+            if hasattr(layer, 'disable_OU_noise'):
+                layer.disable_OU_noise = True
+
+    def enable_OU_noise(self):
+        """
+        Enables injection of OU noise
+        """
+        logging.info("Enabling OU noise modelling")
+        for layer in self.layers:
+            if hasattr(layer, 'disable_OU_noise'):
+                layer.disable_OU_noise = False
+
+
+
 
     def update(self, inputs, targets):
         """Performs an update step to the following equations defining the ODE of the neural network dynamics:

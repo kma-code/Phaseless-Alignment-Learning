@@ -145,6 +145,8 @@ def validate_model(model, val_loader):
     total_cnt = 0
     val_accuracies = []
     model.eval()
+    model.disable_OU_noise()
+
     for batch_idx, (x, target) in enumerate(val_loader):
         if use_cuda:
             x, target = x.cuda(), target.cuda()
@@ -154,15 +156,13 @@ def validate_model(model, val_loader):
             model.update(x, target)
 
         out = model.rho[-1]
-        # print("x", x.size())
-        # print("out", out.size())
-        # print("target", target.size())
 
         loss = model.errors[-1]
         _, pred_label = torch.max(out, 1)
         total_cnt += x.shape[0]
         correct_cnt += (pred_label == torch.max(target, 1)[1]).sum()
         summed_loss  += loss.detach().cpu().numpy()
+
 
         if (batch_idx + 1) % 100 == 0 or (batch_idx + 1) == len(val_loader):
             if model.epoch == 0:
@@ -207,6 +207,8 @@ def validate_model(model, val_loader):
     else:
         deg_WTB = None
 
+    model.enable_OU_noise()
+
     return (correct_cnt/total_cnt).detach().cpu().numpy(), deg_WTB
 
 
@@ -222,6 +224,7 @@ def test_model(model, test_loader):
     summed_loss = 0
     total_cnt = 0
     model.eval()
+    model.disable_OU_noise()
 
     for batch_idx, (x, target) in enumerate(test_loader):
         # # we need to flatten images
@@ -241,6 +244,10 @@ def test_model(model, test_loader):
 
         if (batch_idx + 1) % 100 == 0 or (batch_idx + 1) == len(test_loader):
             logging.info(f'Epochs trained: {model.epoch}, batch index: {batch_idx + 1}, test loss:  {correct_cnt/total_cnt:.9f}')
+
+    model.enable_OU_noise()
+
+    return (correct_cnt/total_cnt).detach().cpu().numpy()
 
 
 if __name__ == '__main__':
@@ -516,6 +523,8 @@ if __name__ == '__main__':
 
     logging.info('Starting training')
 
+    train_accuracies = []
+
     # for epoch in tqdm(range(epochs), desc="Epochs"):
     for epoch in range(model.epoch, epochs):
         # training
@@ -543,7 +552,9 @@ if __name__ == '__main__':
             # loss.backward()
             # optimizer.step()
             if (batch_idx + 1) % 100 == 0 or (batch_idx + 1) == len(train_loader):
-                logging.info(f'Epoch: {epoch+1}, batch index: {batch_idx + 1}, train loss: {(np.abs(summed_loss).sum(1)/total_cnt).mean(0):.9f}')
+                logging.info(f'Epoch: {epoch+1}, batch index: {batch_idx + 1}, train loss: {(np.abs(summed_loss).sum(1)/total_cnt).mean(0):.9f}, train acc:  {correct_cnt/total_cnt:.9f}')
+        
+        train_accuracies.append((correct_cnt / total_cnt).cpu().numpy())
 
         # validate
         val, deg_WTB = validate_model(model, val_loader)
@@ -557,9 +568,13 @@ if __name__ == '__main__':
        pickle.dump(model, output, pickle.HIGHEST_PROTOCOL)
        logging.info(f'Saved model to {output.name}')
 
+    with open(PATH_OUTPUT + "train_acc.pkl", "wb") as output:
+        pickle.dump(train_accuracies, output)
+        logging.info(f"Saving train accuracies to {output.name}")
+
     with open(PATH_OUTPUT + "val_acc.pkl", "wb") as output:
         pickle.dump(model.val_acc, output)
-        logging.info(f"Saving loss to {output.name}")
+        logging.info(f"Saving val accuracies to {output.name}")
 
         # plot val loss
         ax = plt.figure(figsize=(7,5))
@@ -602,5 +617,9 @@ if __name__ == '__main__':
 
     
     # evaluate model on test set
-    test_model(model, test_loader)
+    test_acc = test_model(model, test_loader)
+
+    with open(PATH_OUTPUT + "test_acc.pkl", "wb") as output:
+        pickle.dump(test_acc, output)
+        logging.info(f"Saving test accuracies to {output.name}")
 
