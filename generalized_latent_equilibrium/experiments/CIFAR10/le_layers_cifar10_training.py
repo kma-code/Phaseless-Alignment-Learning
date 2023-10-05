@@ -143,7 +143,6 @@ def validate_model(model, val_loader):
 
     correct_cnt, summed_loss = 0, 0
     total_cnt = 0
-    val_accuracies = []
     model.eval()
     model.disable_OU_noise()
 
@@ -169,8 +168,6 @@ def validate_model(model, val_loader):
                 logging.info(f'Epoch: before training, batch index: {batch_idx + 1}, val acc:  {correct_cnt/total_cnt:.9f}')
             else:
                 logging.info(f'Epoch: {model.epoch}, batch index: {batch_idx + 1}, val acc:  {correct_cnt/total_cnt:.9f}')
-
-    val_accuracies.append((correct_cnt / total_cnt).cpu().numpy())
 
     # # record weights
     # weights_arr = [layer.weights.detach().cpu().numpy() for layer in model.layers] if rec_weights else None
