@@ -522,6 +522,9 @@ if __name__ == '__main__':
 
     train_accuracies = []
 
+    rho_arr_all_epochs = []
+    rho_HP_arr_all_epochs = []
+
     # for epoch in tqdm(range(epochs), desc="Epochs"):
     for epoch in range(model.epoch, epochs):
         # training
@@ -530,6 +533,8 @@ if __name__ == '__main__':
         summed_loss = 0
         model.epoch += 1
         model.train()
+        rho_arr = np.array([[0.0, 0.0] for layer in model.layers])
+        rho_HP_arr = np.array([[0.0, 0.0] for layer in model.layers])
         for batch_idx, (x, target) in enumerate(tqdm(train_loader, desc="Batches", disable=tqdm_disabled)):
         # for batch_idx, (x, label) in enumerate(train_loader):
             # optimizer.zero_grad()
@@ -539,6 +544,13 @@ if __name__ == '__main__':
 
             for update_i in range(presentation_steps):
                 model.update(x, target)
+                if rec_degs:
+                    for i, layer in enumerate(model.layers):
+                        try:
+                            rho_arr[i] += [layer.rho.detach().cpu().numpy().mean(), layer.rho.detach().cpu().numpy().std()]
+                            rho_HP_arr[i] += [layer.rho_HP.detach().cpu().numpy().mean(), layer.rho_HP.detach().cpu().numpy().std()]
+                        except:
+                            continue
 
             loss = model.errors[-1]
             out = model.rho[-1]
@@ -552,7 +564,15 @@ if __name__ == '__main__':
                 logging.info(f'Epoch: {epoch+1}, batch index: {batch_idx + 1}, train loss: {(np.abs(summed_loss).sum(1)/total_cnt).mean(0):.9f}, train acc:  {correct_cnt/total_cnt:.9f}')
         
         train_accuracies.append((correct_cnt / total_cnt).cpu().numpy())
-
+        
+        if rec_degs:
+            rho_arr = rho_arr / presentation_steps / (batch_idx + 1)
+            rho_HP_arr = rho_HP_arr / presentation_steps / (batch_idx + 1)
+            logging.info(f"rho mean, std: {rho_arr}")
+            logging.info(f"rho_HP mean, std: {rho_HP_arr}")
+            rho_arr_all_epochs.append(rho_arr)
+            rho_HP_arr_all_epochs.append(rho_HP_arr)
+        
         # validate
         val, deg_WTB = validate_model(model, val_loader)
         model.val_acc.append(val)
@@ -611,6 +631,13 @@ if __name__ == '__main__':
         with open(PATH_OUTPUT + "bw_weights_epoch" + str(model.epoch) + ".pkl", "wb") as output:
             logging.info(f"Saving backwards weights to {output.name}")
             pickle.dump(bw_weights_arr, output)
+
+        with open(PATH_OUTPUT + "rho_train.pkl", "wb") as output:
+            logging.info(f"Saving activations rho to {output.name}")
+            pickle.dump(rho_arr_all_epochs, output)
+        with open(PATH_OUTPUT + "rho_HP_train.pkl", "wb") as output:
+            logging.info(f"Saving HP activations rho_HP to {output.name}")
+            pickle.dump(rho_HP_arr_all_epochs, output)
 
     
     # evaluate model on test set
