@@ -225,10 +225,12 @@ class Conv2d(object):
         return self.forward(rho, rho_deriv)
 
     def parameters(self):
-        return [self.kernel, self.biases]
+        return [self.kernel, self.biases, self.bw_weights if self.algorithm in ['FA', 'PAL'] else None]
 
     def update_parameters(self, new_params):
         self.kernel, self.biases = new_params[0], new_params[1]
+        if self.algorithm in ['FA', 'PAL']:
+            self.bw_weights = new_params[2]
 
 class Conv2d_PAL(Conv2d):
     """
@@ -775,10 +777,12 @@ class Projection(object):
         return self.forward(rho, rho_deriv)
 
     def parameters(self):
-        return [self.weights, self.biases]
+        return [self.weights, self.biases, self.bw_weights if self.algorithm in ['FA', 'PAL'] else None]
 
     def update_parameters(self, new_params):
         self.weights, self.biases = new_params[0], new_params[1]
+        if self.algorithm in ['FA', 'PAL']:
+            self.bw_weights = new_params[2]
 
 
 class Projection_PAL(Projection):
@@ -1167,10 +1171,12 @@ class Linear(object):
         return self.forward(rho, rho_deriv)
 
     def parameters(self):
-        return [self.weights, self.biases]
+        return [self.weights, self.biases, self.bw_weights if self.algorithm in ['FA', 'PAL'] else None]
 
     def update_parameters(self, new_params):
         self.weights, self.biases = new_params[0], new_params[1]
+        if self.algorithm in ['FA', 'PAL']:
+            self.bw_weights = new_params[2]
 
 
 class Linear_PAL(Linear):
