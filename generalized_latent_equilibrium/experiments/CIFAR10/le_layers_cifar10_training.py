@@ -155,7 +155,7 @@ def validate_model(model, val_loader):
 
         for update_i in range(presentation_steps):
             model.update(x, target)
-            if rec_degs:
+            if rec_prosp_u:
                 for i, layer in enumerate(model.layers):
                     voltage_lookaheads_arr[i] += [layer.voltage_lookaheads.detach().cpu().numpy().mean(), layer.voltage_lookaheads.detach().cpu().numpy().std()]
 
@@ -209,7 +209,7 @@ def validate_model(model, val_loader):
     else:
         deg_WTB = None
 
-    if rec_degs:
+    if rec_prosp_u:
         voltage_lookaheads_arr = voltage_lookaheads_arr / presentation_steps / (batch_idx + 1)
         logging.info(f"validation u_prosp mean, std: \n {voltage_lookaheads_arr}")
     else:
@@ -289,7 +289,7 @@ if __name__ == '__main__':
     parser.add_argument('--sigma', default=[1e-2,1e-2,1e-2,1e-2,1e-2,0], help="Stdev of Ornstein-Uhlenbeck noise injected into each layer")
     # recording of params
     parser.add_argument('--rec_degs', default=False, action='store_true', help="Record angle between W.T and B")
-    parser.add_argument('--rec_activations', default=False, action='store_true', help="Record activations after every presentation time")
+    parser.add_argument('--rec_prosp_u', default=False, action='store_true', help="Record prospective voltage")
     parser.add_argument('--rec_noise', default=False, action='store_true', help="Record injected noise (PAL only)")
     # whether to test and validate before training
     parser.add_argument('--debug', default=False, action='store_true', help="Disable testing and validation before training")
@@ -319,10 +319,10 @@ if __name__ == '__main__':
             rec_degs = PARAMETERS["rec_degs"]
         else:
             rec_degs = False
-        if "rec_activations" in PARAMETERS:
-            rec_activations = PARAMETERS["rec_activations"]
+        if "rec_prosp_u" in PARAMETERS:
+            rec_prosp_u = PARAMETERS["rec_prosp_u"]
         else:
-            rec_activations = False
+            rec_prosp_u = False
         if "rec_noise" in PARAMETERS:
             rec_noise = PARAMETERS["rec_noise"]
         else:
@@ -361,7 +361,7 @@ if __name__ == '__main__':
         wn_sigma = args.wn_sigma
 
         rec_degs = args.rec_degs
-        rec_activations = args.rec_activations
+        rec_prosp_u = args.rec_prosp_u
         rec_noise = args.rec_noise
     
     DEBUG = args.debug
@@ -434,8 +434,8 @@ if __name__ == '__main__':
 
     if rec_degs:
         logging.info(f'Recording angle of weights after every evaluation: {rec_degs}')
-    if rec_activations or rec_noise:
-        logging.info(f'Recording during evaluation after every presentation time: Angle (W.T,B): {rec_degs}, Activations: {rec_activations}, Noise: {rec_noise}')
+    if rec_prosp_u:
+        logging.info(f'Recording prosp_u during validation and training: {rec_prosp_u}')
 
     # create output directory if it doesn't exist
     if not(os.path.exists(PATH_OUTPUT)):
@@ -506,7 +506,7 @@ if __name__ == '__main__':
         model.val_acc.append(val)
         if rec_degs and model.deg_arr is not None:
             model.deg_arr.append(deg_WTB)
-        if rec_degs:
+        if rec_prosp_u:
             voltage_lookaheads_val_arr_all_epochs.append(voltage_lookaheads_val_arr)
             
     if rec_degs:
@@ -557,7 +557,7 @@ if __name__ == '__main__':
 
             for update_i in range(presentation_steps):
                 model.update(x, target)
-                if rec_degs:
+                if rec_prosp_u:
                     for i, layer in enumerate(model.layers):
                         voltage_lookaheads_arr[i] += [layer.voltage_lookaheads.detach().cpu().numpy().mean(), layer.voltage_lookaheads.detach().cpu().numpy().std()]
 
@@ -574,7 +574,7 @@ if __name__ == '__main__':
         
         train_accuracies.append((correct_cnt / total_cnt).cpu().numpy())
         
-        if rec_degs:
+        if rec_prosp_u:
             voltage_lookaheads_arr = voltage_lookaheads_arr / presentation_steps / (batch_idx + 1)
             logging.info(f"train u_prosp mean, std: \n {voltage_lookaheads_arr}")
             voltage_lookaheads_arr_all_epochs.append(voltage_lookaheads_arr)
@@ -637,7 +637,8 @@ if __name__ == '__main__':
         with open(PATH_OUTPUT + "bw_weights_epoch" + str(model.epoch) + ".pkl", "wb") as output:
             logging.info(f"Saving backwards weights to {output.name}")
             pickle.dump(bw_weights_arr, output)
-
+            
+    if rec_prosp_u:
         with open(PATH_OUTPUT + "prosp_u_val.pkl", "wb") as output:
             logging.info(f"Saving somatic potential u during validation to {output.name}")
             pickle.dump(voltage_lookaheads_val_arr_all_epochs, output)
