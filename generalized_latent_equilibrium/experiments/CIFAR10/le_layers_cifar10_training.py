@@ -146,6 +146,8 @@ def validate_model(model, val_loader):
     model.eval()
     model.disable_OU_noise()
 
+    voltage_lookaheads_arr = np.array([[0.0, 0.0] for layer in model.layers])
+
     for batch_idx, (x, target) in enumerate(val_loader):
         if use_cuda:
             x, target = x.cuda(), target.cuda()
@@ -153,6 +155,9 @@ def validate_model(model, val_loader):
 
         for update_i in range(presentation_steps):
             model.update(x, target)
+            if rec_degs:
+                for i, layer in enumerate(model.layers):
+                    voltage_lookaheads_arr[i] += [layer.voltage_lookaheads.detach().cpu().numpy().mean(), layer.voltage_lookaheads.detach().cpu().numpy().std()]
 
         out = model.rho[-1]
 
@@ -204,9 +209,15 @@ def validate_model(model, val_loader):
     else:
         deg_WTB = None
 
+    if rec_degs:
+        voltage_lookaheads_arr = voltage_lookaheads_arr / presentation_steps / (batch_idx + 1)
+        logging.info(f"validation u_prosp mean, std: \n {voltage_lookaheads_arr}")
+    else:
+        voltage_lookaheads_arr = None
+
     model.enable_OU_noise()
 
-    return (correct_cnt/total_cnt).detach().cpu().numpy(), deg_WTB
+    return (correct_cnt/total_cnt).detach().cpu().numpy(), deg_WTB, voltage_lookaheads_arr
 
 
 def test_model(model, test_loader):
@@ -480,6 +491,8 @@ if __name__ == '__main__':
     model.val_acc = []
     model.deg_arr = []
 
+    voltage_lookaheads_val_arr_all_epochs = []
+
     ## save model at init
     #with open(PATH_OUTPUT + 'MLPNet_epoch0.pkl', 'wb') as output:
     #            pickle.dump(model, output, pickle.HIGHEST_PROTOCOL)
@@ -489,10 +502,12 @@ if __name__ == '__main__':
 
     logging.info(f"Target type: {model.target_type}")
     if DEBUG == False:
-        val, deg_WTB = validate_model(model, val_loader)
+        val, deg_WTB, voltage_lookaheads_val_arr = validate_model(model, val_loader)
         model.val_acc.append(val)
         if rec_degs and model.deg_arr is not None:
             model.deg_arr.append(deg_WTB)
+        if rec_degs:
+            voltage_lookaheads_val_arr_all_epochs.append(voltage_lookaheads_val_arr)
             
     if rec_degs:
         # save weights
@@ -561,11 +576,11 @@ if __name__ == '__main__':
         
         if rec_degs:
             voltage_lookaheads_arr = voltage_lookaheads_arr / presentation_steps / (batch_idx + 1)
-            logging.info(f"u_prosp mean, std: \n {voltage_lookaheads_arr}")
+            logging.info(f"train u_prosp mean, std: \n {voltage_lookaheads_arr}")
             voltage_lookaheads_arr_all_epochs.append(voltage_lookaheads_arr)
         
         # validate
-        val, deg_WTB = validate_model(model, val_loader)
+        val, deg_WTB, voltage_lookaheads_val_arr_all_epochs = validate_model(model, val_loader)
         model.val_acc.append(val)
         if rec_degs and model.deg_arr is not None:
             model.deg_arr.append(deg_WTB)
@@ -623,9 +638,12 @@ if __name__ == '__main__':
             logging.info(f"Saving backwards weights to {output.name}")
             pickle.dump(bw_weights_arr, output)
 
+        with open(PATH_OUTPUT + "prosp_u_val.pkl", "wb") as output:
+            logging.info(f"Saving somatic potential u during validation to {output.name}")
+            pickle.dump(voltage_lookaheads_val_arr_all_epochs, output)
         with open(PATH_OUTPUT + "prosp_u_train.pkl", "wb") as output:
-            logging.info(f"Saving somatic potential u to {output.name}")
-            pickle.dump(voltage_lookaheads_arr_all_epochs, output)
+            logging.info(f"Saving somatic potential u during training to {output.name}")
+            pickle.dump(voltage_lookaheads_train_arr_all_epochs, output)
 
     
     # evaluate model on test set
