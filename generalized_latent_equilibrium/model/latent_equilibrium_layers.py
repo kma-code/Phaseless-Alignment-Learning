@@ -225,12 +225,12 @@ class Conv2d(object):
         return self.forward(rho, rho_deriv)
 
     def parameters(self):
-        return [self.kernel, self.biases, self.bw_weights if self.algorithm in ['FA', 'PAL'] else None]
+        return [self.kernel, self.biases, self.weights_flat, self.bw_weights if self.algorithm in ['FA', 'PAL'] else None]
 
     def update_parameters(self, new_params):
-        self.kernel, self.biases = new_params[0], new_params[1]
+        self.kernel, self.biases, self.weights_flat = new_params[0], new_params[1], new_params[2]
         if self.algorithm in ['FA', 'PAL']:
-            self.bw_weights = new_params[2]
+            self.bw_weights = new_params[3]
 
 class Conv2d_PAL(Conv2d):
     """
