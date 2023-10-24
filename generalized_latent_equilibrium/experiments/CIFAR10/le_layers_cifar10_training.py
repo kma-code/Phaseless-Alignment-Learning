@@ -407,15 +407,15 @@ if __name__ == '__main__':
     # if not existing, download mnist dataset
     train_set = datasets.CIFAR10(root=PATH_SCRIPT + '/cifar10_data', train=True, transform=transform, target_transform=target_transform,download=True)
     test_set  = datasets.CIFAR10(root=PATH_SCRIPT + '/cifar10_data', train=False, transform=transform, target_transform=target_transform,download=True)
-    # # cut down training and test sets for debugging
-    # indices = torch.arange(128)
-    # train_set = data_utils.Subset(train_set, indices)
-    # indices = torch.arange(64)
-    # test_set = data_utils.Subset(test_set, indices)
+    # cut down training and test sets for debugging
+    indices = torch.arange(128)
+    train_set = data_utils.Subset(train_set, indices)
+    indices = torch.arange(64)
+    test_set = data_utils.Subset(test_set, indices)
 
     classes = classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
 
-    val_size = 10_000
+    val_size = 10
     train_size = len(train_set) - val_size
 
     train_set, val_set = random_split(train_set, [train_size, val_size], generator=torch.Generator().manual_seed(seed))
@@ -537,7 +537,7 @@ if __name__ == '__main__':
 
     train_accuracies = []
 
-    voltage_lookaheads_arr_all_epochs = []
+    voltage_lookaheads_train_arr_all_epochs = []
 
     # for epoch in tqdm(range(epochs), desc="Epochs"):
     for epoch in range(model.epoch, epochs):
@@ -547,7 +547,7 @@ if __name__ == '__main__':
         summed_loss = 0
         model.epoch += 1
         model.train()
-        voltage_lookaheads_arr = np.array([[0.0, 0.0] for layer in model.layers])
+        voltage_lookaheads_train_arr = np.array([[0.0, 0.0] for layer in model.layers])
         for batch_idx, (x, target) in enumerate(tqdm(train_loader, desc="Batches", disable=tqdm_disabled)):
         # for batch_idx, (x, label) in enumerate(train_loader):
             # optimizer.zero_grad()
@@ -559,7 +559,7 @@ if __name__ == '__main__':
                 model.update(x, target)
                 if rec_prosp_u:
                     for i, layer in enumerate(model.layers):
-                        voltage_lookaheads_arr[i] += [layer.voltage_lookaheads.detach().cpu().numpy().mean(), layer.voltage_lookaheads.detach().cpu().numpy().std()]
+                        voltage_lookaheads_train_arr[i] += [layer.voltage_lookaheads.detach().cpu().numpy().mean(), layer.voltage_lookaheads.detach().cpu().numpy().std()]
 
             loss = model.errors[-1]
             out = model.rho[-1]
@@ -575,15 +575,17 @@ if __name__ == '__main__':
         train_accuracies.append((correct_cnt / total_cnt).cpu().numpy())
         
         if rec_prosp_u:
-            voltage_lookaheads_arr = voltage_lookaheads_arr / presentation_steps / (batch_idx + 1)
-            logging.info(f"train u_prosp mean, std: \n {voltage_lookaheads_arr}")
-            voltage_lookaheads_arr_all_epochs.append(voltage_lookaheads_arr)
+            voltage_lookaheads_train_arr = voltage_lookaheads_train_arr / presentation_steps / (batch_idx + 1)
+            logging.info(f"train u_prosp mean, std: \n {voltage_lookaheads_train_arr}")
+            voltage_lookaheads_train_arr_all_epochs.append(voltage_lookaheads_train_arr)
         
         # validate
-        val, deg_WTB, voltage_lookaheads_val_arr_all_epochs = validate_model(model, val_loader)
+        val, deg_WTB, voltage_lookaheads_val_arr = validate_model(model, val_loader)
         model.val_acc.append(val)
         if rec_degs and model.deg_arr is not None:
             model.deg_arr.append(deg_WTB)
+        if rec_prosp_u:
+            voltage_lookaheads_val_arr_all_epochs.append(voltage_lookaheads_val_arr)
 
     # after training, save model
     
@@ -637,7 +639,7 @@ if __name__ == '__main__':
         with open(PATH_OUTPUT + "bw_weights_epoch" + str(model.epoch) + ".pkl", "wb") as output:
             logging.info(f"Saving backwards weights to {output.name}")
             pickle.dump(bw_weights_arr, output)
-            
+
     if rec_prosp_u:
         with open(PATH_OUTPUT + "prosp_u_val.pkl", "wb") as output:
             logging.info(f"Saving somatic potential u during validation to {output.name}")
