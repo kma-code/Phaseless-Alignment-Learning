@@ -64,7 +64,7 @@ def deg(cos):
 
 def LeNet5(batch_size, lr_multiplier, lr_factors, tau=10.0, dt=0.1, beta=0.1, algorithm='BP',
            model_variant=ModelVariant.VANILLA, target_type=TargetType.RATE, presentation_steps=10, with_optimizer=False,
-           bw_lr_factors=None, regularizer=None, tau_xi=None, tau_HP=None, tau_LO=None, sigma=None, wn_sigma=[0,0,0,0]):
+           bw_lr_factors=None, regularizer=None, tau_xi=None, tau_HP=None, tau_LO=None, sigma=None, wn_sigma=[0,0,0,0], activation="TanH"):
     """
     - 2 Convs with max pooling and relu
     - 2 Fully connected layers and relu
@@ -73,7 +73,12 @@ def LeNet5(batch_size, lr_multiplier, lr_factors, tau=10.0, dt=0.1, beta=0.1, al
 
     #act_func = tu.HardSigmoid
     logging.info(f"Initializing network using {algorithm}")
-    act_func = tu.TanH
+    if activation == 'TanH':
+        act_func = tu.TanH
+    elif activation == 'Sigmoid':
+        act_func = tu.Sigmoid
+    elif activation == 'HardSigmoid':
+        act_func = tu.HardSigmoid
     logging.info(f'Initializing net with activation function {act_func}')
 
     if algorithm == 'PAL':
@@ -280,6 +285,7 @@ if __name__ == '__main__':
     parser.add_argument('--params', default=None, type=str, help='Load parameters from file (overrides manual params).')
     parser.add_argument('--wn_sigma', default=[0,0,0,0,0,0], help="Stdev of white noise injected into each layer")
     parser.add_argument('--target_type', default="mse", help="Function used to inject error at output layer (default: mse)")
+    parser.add_argument('--activation', default="TanH", help="Activation function (default: TanH)")
     # additional params for PAL
     parser.add_argument('--bw_lr_factors', default=[1e-2,1e-2,1e-2,1e-2,1e-2,1e-2], help="Learning rate multipliers for backwards weights originating from each layer")
     parser.add_argument('--regularizer', default=[1e-4,1e-4,1e-4,1e-4,1e-4,1e-4], help="Size of weight decay regularizer")
@@ -336,6 +342,10 @@ if __name__ == '__main__':
             tau_LO = PARAMETERS["tau_LO"]
             sigma = PARAMETERS["sigma"]
         wn_sigma = PARAMETERS["wn_sigma"]
+        if "activation" in PARAMETERS:
+            activation = PARAMETERS["activation"]
+        else:
+            activation = "TanH"
 
     else:
         PATH_OUTPUT = PATH_SCRIPT + '/output/'
@@ -459,9 +469,9 @@ if __name__ == '__main__':
 
             if algorithm == 'PAL':
                 model = LeNet5(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer,
-                               bw_lr_factors = bw_lr_factors, regularizer = regularizer, tau_xi = tau_xi, tau_HP = tau_HP, tau_LO = tau_LO, sigma = sigma, wn_sigma = wn_sigma)
+                               bw_lr_factors = bw_lr_factors, regularizer = regularizer, tau_xi = tau_xi, tau_HP = tau_HP, tau_LO = tau_LO, sigma = sigma, wn_sigma = wn_sigma, activation = activation)
             else:
-                model = LeNet5(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer, wn_sigma=wn_sigma)
+                model = LeNet5(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer, wn_sigma=wn_sigma, activation = activation)
 
             model.epoch = old_model.epoch
             model.update_parameters(old_model.list_parameters())
@@ -478,10 +488,10 @@ if __name__ == '__main__':
             # model = MLPNet(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer,
             #                bw_lr_factors = bw_lr_factors, regularizer = regularizer, tau_xi = tau_xi, tau_HP = tau_HP, tau_LO = tau_LO, sigma = sigma, wn_sigma = wn_sigma)
             model = LeNet5(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer,
-                           bw_lr_factors = bw_lr_factors, regularizer = regularizer, tau_xi = tau_xi, tau_HP = tau_HP, tau_LO = tau_LO, sigma = sigma, wn_sigma = wn_sigma)
+                           bw_lr_factors = bw_lr_factors, regularizer = regularizer, tau_xi = tau_xi, tau_HP = tau_HP, tau_LO = tau_LO, sigma = sigma, wn_sigma = wn_sigma, activation = activation)
         else:
             #model = MLPNet(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer, wn_sigma=wn_sigma)
-            model = LeNet5(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer, wn_sigma=wn_sigma)
+            model = LeNet5(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer, wn_sigma=wn_sigma, activation = activation)
         model.epoch = 0
 
     # optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
