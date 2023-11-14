@@ -79,7 +79,7 @@ def LeNet5(batch_size, lr_multiplier, lr_factors, tau=10.0, dt=0.1, beta=0.1, al
         act_func = tu.Sigmoid
     elif activation == 'HardSigmoid':
         act_func = tu.HardSigmoid
-    logging.info(f'Initializing net with activation function {act_func}')
+    logging.info(f'Initializing LeNet5 net with activation function {act_func}')
 
     if algorithm == 'PAL':
         l1 = nn.Conv2d_PAL(3, 20, 5, batch_size, 32, act_func, algorithm=algorithm)
@@ -111,14 +111,23 @@ def LeNet5(batch_size, lr_multiplier, lr_factors, tau=10.0, dt=0.1, beta=0.1, al
 
 def MLPNet(batch_size, lr_multiplier, lr_factors, tau=10.0, dt=0.1, beta=0.1, algorithm='BP',
            model_variant=ModelVariant.VANILLA, target_type=TargetType.RATE, presentation_steps=10, with_optimizer=False,
-           bw_lr_factors=None, regularizer=None, tau_xi=None, tau_HP=None, tau_LO=None, sigma=None, wn_sigma=[0,0,0,0]):
+           bw_lr_factors=None, regularizer=None, tau_xi=None, tau_HP=None, tau_LO=None, sigma=None, wn_sigma=[0,0,0,0], activation="TanH"):
     """
     4 layer fully connected network
     """
     learning_rate = 0.125 * lr_multiplier / presentation_steps / dt
     # learning_rate = [1.0, 0.2, 0.1, 0.05]
 
-    act_func = tu.TanH
+    #act_func = tu.TanH
+    logging.info(f"Initializing MLP network using {algorithm}")
+    if activation == 'TanH':
+        act_func = tu.TanH
+    elif activation == 'Sigmoid':
+        act_func = tu.Sigmoid
+    elif activation == 'HardSigmoid':
+        act_func = tu.HardSigmoid
+    logging.info(f'Initializing net with activation function {act_func}')
+
     logging.info(f"Initializing network using {algorithm}")
 
     if algorithm == 'PAL':
@@ -156,7 +165,8 @@ def validate_model(model, val_loader):
     for batch_idx, (x, target) in enumerate(val_loader):
         if use_cuda:
             x, target = x.cuda(), target.cuda()
-        # x = x.view(-1, 32 * 32 * 3)
+        if network_type == 'MLPNet':
+            x = x.view(-1, 32 * 32 * 3)
 
         for update_i in range(presentation_steps):
             model.update(x, target)
@@ -280,7 +290,8 @@ def test_model(model, test_loader):
 
     for batch_idx, (x, target) in enumerate(test_loader):
         # # we need to flatten images
-        # x = x.view(-1, 32 * 32 * 3)
+        if network_type == 'MLPNet':
+            x = x.view(-1, 32 * 32 * 3)
         if use_cuda:
             x, target = x.cuda(), target.cuda()
 
@@ -313,6 +324,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train a Latent Equilibrium Neural Network on MNIST and check accuracy.')
     parser.add_argument('--algorithm', default="BP", type=str, help="Model algorithm: BP or FA")
     parser.add_argument('--model_variant', default="vanilla", type=str, help="Model variant: vanilla, full_forward_pass")
+    parser.add_argument('--network_type', default="LeNet5", type=str, help="Network model: LeNet5, MLPNet")
     parser.add_argument('--batch_size', default=32, type=int, help="Batch size for training")
     parser.add_argument('--batch_learning_multiplier', default=64, type=int, help="Learning rate multiplier for batch learning")
     parser.add_argument('--lr_factors', default=[1.0, 0.2, 0.2, 0.2, 0.2, 0.1], help="Learning rate multipliers for each layer")
@@ -385,6 +397,10 @@ if __name__ == '__main__':
             activation = PARAMETERS["activation"]
         else:
             activation = "TanH"
+        if "network_type" in PARAMETERS:
+            network_type = PARAMETERS['network_type']
+        else:
+            network_type = "LeNet5"
 
     else:
         PATH_OUTPUT = PATH_SCRIPT + '/output/'
@@ -412,6 +428,8 @@ if __name__ == '__main__':
         rec_degs = args.rec_degs
         rec_prosp_u = args.rec_prosp_u
         rec_noise = args.rec_noise
+
+        network_type = args.network_type
     
     DEBUG = args.debug
     RELOAD = args.reload
@@ -513,10 +531,17 @@ if __name__ == '__main__':
         if RELOAD:
 
             if algorithm == 'PAL':
-                model = LeNet5(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer,
+                if network_type == 'MLPNet':
+                    model = MLPNet(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer,
                                bw_lr_factors = bw_lr_factors, regularizer = regularizer, tau_xi = tau_xi, tau_HP = tau_HP, tau_LO = tau_LO, sigma = sigma, wn_sigma = wn_sigma, activation = activation)
+                elif network_type == 'LeNet5':
+                    model = LeNet5(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer,
+                                   bw_lr_factors = bw_lr_factors, regularizer = regularizer, tau_xi = tau_xi, tau_HP = tau_HP, tau_LO = tau_LO, sigma = sigma, wn_sigma = wn_sigma, activation = activation)
             else:
-                model = LeNet5(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer, wn_sigma=wn_sigma, activation = activation)
+                if network_type == 'MLPNet':
+                    model = MLPNet(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer, wn_sigma=wn_sigma, activation = activation)
+                elif network_type == 'LeNet5':
+                    model = LeNet5(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer, wn_sigma=wn_sigma, activation = activation)
 
             model.epoch = old_model.epoch
             model.update_parameters(old_model.list_parameters())
@@ -530,13 +555,17 @@ if __name__ == '__main__':
         # training
 
         if algorithm == 'PAL':
-            # model = MLPNet(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer,
-            #                bw_lr_factors = bw_lr_factors, regularizer = regularizer, tau_xi = tau_xi, tau_HP = tau_HP, tau_LO = tau_LO, sigma = sigma, wn_sigma = wn_sigma)
-            model = LeNet5(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer,
-                           bw_lr_factors = bw_lr_factors, regularizer = regularizer, tau_xi = tau_xi, tau_HP = tau_HP, tau_LO = tau_LO, sigma = sigma, wn_sigma = wn_sigma, activation = activation)
+            if network_type == 'MLPNet':
+                model = MLPNet(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer,
+                               bw_lr_factors = bw_lr_factors, regularizer = regularizer, tau_xi = tau_xi, tau_HP = tau_HP, tau_LO = tau_LO, sigma = sigma, wn_sigma = wn_sigma, activation = activation)
+            elif network_type == 'LeNet5':
+                model = LeNet5(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer,
+                               bw_lr_factors = bw_lr_factors, regularizer = regularizer, tau_xi = tau_xi, tau_HP = tau_HP, tau_LO = tau_LO, sigma = sigma, wn_sigma = wn_sigma, activation = activation)
         else:
-            #model = MLPNet(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer, wn_sigma=wn_sigma)
-            model = LeNet5(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer, wn_sigma=wn_sigma, activation = activation)
+            if network_type == 'MLPNet':
+                model = MLPNet(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer, wn_sigma=wn_sigma, activation = activation)
+            elif network_type == 'LeNet5':
+                model = LeNet5(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer, wn_sigma=wn_sigma, activation = activation)
         model.epoch = 0
 
     # optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
@@ -610,7 +639,8 @@ if __name__ == '__main__':
             # optimizer.zero_grad()
             if use_cuda:
                 x, target = x.cuda(), target.cuda()
-            # x = x.view(-1, 32 * 32 * 3)
+            if network_type == 'MLPNet':
+                x = x.view(-1, 32 * 32 * 3)
 
             for update_i in range(presentation_steps):
                 model.update(x, target)
