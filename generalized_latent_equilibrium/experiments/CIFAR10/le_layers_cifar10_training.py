@@ -547,6 +547,8 @@ if __name__ == '__main__':
     model.deg_arr = []
 
     voltage_lookaheads_val_arr_all_epochs = []
+    prosp_u_without_noise_time_series_epochs = []
+    prosp_u_with_noise_time_series_epochs = []
 
     ## save model at init
     #with open(PATH_OUTPUT + 'MLPNet_epoch0.pkl', 'wb') as output:
@@ -644,6 +646,8 @@ if __name__ == '__main__':
             # record actual voltages
             logging.info("Recording prosp_u with and without noise")
             prosp_u_without_noise_time_series, prosp_u_with_noise_time_series = compare_prosp_u(model, comp_loader)
+            prosp_u_without_noise_time_series_epochs.append(prosp_u_without_noise_time_series)
+            prosp_u_with_noise_time_series_epochs.append(prosp_u_with_noise_time_series)
 
     # after training, save model
     
@@ -705,12 +709,12 @@ if __name__ == '__main__':
         with open(PATH_OUTPUT + "prosp_u_train.pkl", "wb") as output:
             logging.info(f"Saving somatic potential u during training to {output.name}")
             pickle.dump(voltage_lookaheads_train_arr_all_epochs, output)
-        with open(PATH_OUTPUT + "prosp_u_without_noise_time_series.pkl", "wb") as output:
+        with open(PATH_OUTPUT + "prosp_u_without_noise_time_series_epochs.pkl", "wb") as output:
             logging.info(f"Saving somatic potential u without noise to {output.name}")
-            pickle.dump(prosp_u_without_noise_time_series, output)
-        with open(PATH_OUTPUT + "prosp_u_with_noise_time_series.pkl", "wb") as output:
+            pickle.dump(prosp_u_without_noise_time_series_epochs, output)
+        with open(PATH_OUTPUT + "prosp_u_with_noise_time_series_epochs.pkl", "wb") as output:
             logging.info(f"Saving somatic potential u with noise to {output.name}")
-            pickle.dump(prosp_u_with_noise_time_series, output)
+            pickle.dump(prosp_u_with_noise_time_series_epochs, output)
 
     
     # evaluate model on test set
