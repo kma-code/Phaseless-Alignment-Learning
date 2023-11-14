@@ -160,7 +160,7 @@ def validate_model(model, val_loader):
 
         for update_i in range(presentation_steps):
             model.update(x, target)
-            if rec_prosp_u:
+            if False: #rec_prosp_u:
                 for i, layer in enumerate(model.layers):
                     voltage_lookaheads_arr[i] += [layer.voltage_lookaheads.detach().cpu().numpy().mean(), layer.voltage_lookaheads.detach().cpu().numpy().std()]
 
@@ -214,7 +214,7 @@ def validate_model(model, val_loader):
     else:
         deg_WTB = None
 
-    if rec_prosp_u:
+    if False: #rec_prosp_u:
         voltage_lookaheads_arr = voltage_lookaheads_arr / presentation_steps / (batch_idx + 1)
         logging.info(f"validation u_prosp mean, std: \n {voltage_lookaheads_arr}")
     else:
@@ -223,6 +223,45 @@ def validate_model(model, val_loader):
     model.enable_OU_noise()
 
     return (correct_cnt/total_cnt).detach().cpu().numpy(), deg_WTB, voltage_lookaheads_arr
+
+def compare_prosp_u(model, comp_loader):
+
+    # calculate prosp_u with and without noise inejction
+
+    model.eval()
+    model.disable_OU_noise()
+
+    # run once to clear out swing-in phase
+    for batch_idx, (x, target) in enumerate(comp_loader):
+        if use_cuda:
+            x, target = x.cuda(), target.cuda()
+
+        for update_i in range(presentation_steps):
+            model.update(x, target)
+
+    prosp_u_without_noise_time_series = []
+
+    for batch_idx, (x, target) in enumerate(comp_loader):
+        if use_cuda:
+            x, target = x.cuda(), target.cuda()
+
+        for update_i in range(presentation_steps):
+            model.update(x, target)
+            prosp_u_without_noise_time_series.append([layer.voltage_lookaheads.detach().cpu().numpy() for layer in model.layers])
+
+    model.enable_OU_noise()
+
+    prosp_u_with_noise_time_series = []
+
+    for batch_idx, (x, target) in enumerate(comp_loader):
+        if use_cuda:
+            x, target = x.cuda(), target.cuda()
+
+        for update_i in range(presentation_steps):
+            model.update(x, target)
+            prosp_u_with_noise_time_series.append([layer.voltage_lookaheads.detach().cpu().numpy() for layer in model.layers])
+
+    return prosp_u_without_noise_time_series, prosp_u_with_noise_time_series
 
 
 def test_model(model, test_loader):
@@ -437,10 +476,16 @@ if __name__ == '__main__':
                             num_workers=num_workers, pin_memory=True, worker_init_fn=dataloader_seed_worker, drop_last=True)
     test_loader = DataLoader(dataset=test_set, batch_size=batch_size, shuffle=False,
                              num_workers=num_workers, pin_memory=True, worker_init_fn=dataloader_seed_worker, drop_last=True)
+    if rec_prosp_u:
+        comp_set, _ = random_split(val_set, [batch_size, len(val_set)-batch_size], generator=torch.Generator().manual_seed(seed))
+        comp_loader = DataLoader(dataset=comp_set, batch_size=batch_size, shuffle=False,
+                                num_workers=num_workers, pin_memory=True, worker_init_fn=dataloader_seed_worker, drop_last=True)
 
     logging.info(f'Total training batches: {len(train_loader)}')
     logging.info(f'Total validation batches: {len(val_loader)}')
     logging.info(f'Total testing batches: {len(test_loader)}')
+    if rec_prosp_u:
+        logging.info(f'Total prosp_u comparison samples: {len(comp_loader)}')
 
     if rec_degs:
         logging.info(f'Recording angle of weights after every evaluation: {rec_degs}')
@@ -567,7 +612,7 @@ if __name__ == '__main__':
 
             for update_i in range(presentation_steps):
                 model.update(x, target)
-                if rec_prosp_u:
+                if False: #rec_prosp_u:
                     for i, layer in enumerate(model.layers):
                         voltage_lookaheads_train_arr[i] += [layer.voltage_lookaheads.detach().cpu().numpy().mean(), layer.voltage_lookaheads.detach().cpu().numpy().std()]
 
@@ -584,7 +629,7 @@ if __name__ == '__main__':
         
         train_accuracies.append((correct_cnt / total_cnt).cpu().numpy())
         
-        if rec_prosp_u:
+        if False: #rec_prosp_u:
             voltage_lookaheads_train_arr = voltage_lookaheads_train_arr / presentation_steps / (batch_idx + 1)
             logging.info(f"train u_prosp mean, std: \n {voltage_lookaheads_train_arr}")
             voltage_lookaheads_train_arr_all_epochs.append(voltage_lookaheads_train_arr)
@@ -596,6 +641,9 @@ if __name__ == '__main__':
             model.deg_arr.append(deg_WTB)
         if rec_prosp_u:
             voltage_lookaheads_val_arr_all_epochs.append(voltage_lookaheads_val_arr)
+            # record actual voltages
+            logging.info("Recording prosp_u with and without noise")
+            prosp_u_without_noise_time_series, prosp_u_with_noise_time_series = compare_prosp_u(model, comp_loader)
 
     # after training, save model
     
@@ -657,6 +705,12 @@ if __name__ == '__main__':
         with open(PATH_OUTPUT + "prosp_u_train.pkl", "wb") as output:
             logging.info(f"Saving somatic potential u during training to {output.name}")
             pickle.dump(voltage_lookaheads_train_arr_all_epochs, output)
+        with open(PATH_OUTPUT + "prosp_u_without_noise_time_series.pkl", "wb") as output:
+            logging.info(f"Saving somatic potential u without noise to {output.name}")
+            pickle.dump(prosp_u_without_noise_time_series, output)
+        with open(PATH_OUTPUT + "prosp_u_with_noise_time_series.pkl", "wb") as output:
+            logging.info(f"Saving somatic potential u with noise to {output.name}")
+            pickle.dump(prosp_u_with_noise_time_series, output)
 
     
     # evaluate model on test set
