@@ -79,6 +79,8 @@ def LeNet5(batch_size, lr_multiplier, lr_factors, tau=10.0, dt=0.1, beta=0.1, al
         act_func = tu.Sigmoid
     elif activation == 'HardSigmoid':
         act_func = tu.HardSigmoid
+    elif activation == 'ReLU':
+        act_func = tu.ReLU
     logging.info(f'Initializing LeNet5 net with activation function {act_func}')
 
     if algorithm == 'PAL':
@@ -126,6 +128,8 @@ def MLPNet(batch_size, lr_multiplier, lr_factors, tau=10.0, dt=0.1, beta=0.1, al
         act_func = tu.Sigmoid
     elif activation == 'HardSigmoid':
         act_func = tu.HardSigmoid
+    elif activation == 'ReLU':
+        act_func = tu.ReLU
     logging.info(f'Initializing net with activation function {act_func}')
 
     logging.info(f"Initializing network using {algorithm}")
