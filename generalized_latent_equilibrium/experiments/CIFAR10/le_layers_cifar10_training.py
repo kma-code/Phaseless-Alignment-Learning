@@ -131,10 +131,10 @@ def MLPNet(batch_size, lr_multiplier, lr_factors, tau=10.0, dt=0.1, beta=0.1, al
     logging.info(f"Initializing network using {algorithm}")
 
     if algorithm == 'PAL':
-        fc1 = nn.Linear_PAL(32 * 32 * 3, 1024, act_func, algorithm=algorithm)
-        fc2 = nn.Linear_PAL(1024, 1024, act_func, algorithm=algorithm)
-        fc3 = nn.Linear_PAL(1024, 1024, act_func, algorithm=algorithm)
-        fc4 = nn.Linear_PAL(1024, 10, tu.Linear, algorithm=algorithm)
+        fc1 = nn.Linear_PAL(32 * 32 * 3, 4000, act_func, algorithm=algorithm)
+        fc2 = nn.Linear_PAL(4000, 1000, act_func, algorithm=algorithm)
+        fc3 = nn.Linear_PAL(1000, 4000, act_func, algorithm=algorithm)
+        fc4 = nn.Linear_PAL(4000, 10, tu.Linear, algorithm=algorithm)
 
         network = nn.LESequential([fc1, fc2, fc3, fc4], learning_rate, lr_factors, None, None,
                                   tau, dt, beta, model_variant, target_type, with_optimizer=with_optimizer, algorithm=algorithm,
@@ -144,10 +144,10 @@ def MLPNet(batch_size, lr_multiplier, lr_factors, tau=10.0, dt=0.1, beta=0.1, al
             logging.info(f"Initialized layer with PAL parameters {layer.get_PAL_parameters()}")
 
     else:
-        fc1 = nn.Linear(32 * 32 * 3, 1024, act_func, algorithm=algorithm)
-        fc2 = nn.Linear(1024, 1024, act_func, algorithm=algorithm)
-        fc3 = nn.Linear(1024, 1024, act_func, algorithm=algorithm)
-        fc4 = nn.Linear(1024, 10, tu.Linear, algorithm=algorithm)
+        fc1 = nn.Linear(32 * 32 * 3, 4000, act_func, algorithm=algorithm)
+        fc2 = nn.Linear(4000, 1000, act_func, algorithm=algorithm)
+        fc3 = nn.Linear(1000, 4000, act_func, algorithm=algorithm)
+        fc4 = nn.Linear(4000, 10, tu.Linear, algorithm=algorithm)
         network = nn.LESequential([fc1, fc2, fc3, fc4], learning_rate, lr_factors, None, None,
                                   tau, dt, beta, model_variant, target_type, with_optimizer=with_optimizer, algorithm=algorithm, sigma=sigma, wn_sigma=wn_sigma)
 
