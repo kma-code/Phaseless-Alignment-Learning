@@ -1258,11 +1258,13 @@ class Linear_PAL(Linear):
         # calculate high-pass of current layer rate, to be passed to layer below
         self.rho_HP = self._calc_HP(Delta_rho=self.Delta_rho)
 
-        self.errors = self._calculate_errors(self.voltage_lookaheads, rho_deriv, self.basal_inputs)
+        # self.errors = self._calculate_errors(self.voltage_lookaheads, rho_deriv, self.basal_inputs)
+        self.errors = self._calculate_errors(self.errors, rho_deriv)
 
         return self.rho, self.rho_deriv, self.rho_HP, self.noise
 
-    def _calculate_errors(self, voltage_lookaheads, rho_deriv, basal_inputs):
+    # def _calculate_errors(self, voltage_lookaheads, rho_deriv, basal_inputs):
+    def _calculate_errors(self, errors, rho_deriv):
         """
         Calculate:
             layerwise error:    e = diag(r') B (U - Wr)
@@ -1277,7 +1279,8 @@ class Linear_PAL(Linear):
 
         """
         # e
-        err = rho_deriv * torch.matmul(voltage_lookaheads - basal_inputs, self.bw_weights)
+        # err = rho_deriv * torch.matmul(voltage_lookaheads - basal_inputs, self.bw_weights)
+        err = rho_deriv * torch.matmul(errors, self.bw_weights)
 
         return err
 
