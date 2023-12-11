@@ -205,13 +205,17 @@ def validate_model(model, val_loader):
         deg_WTB = []
         for layer in model.layers:
             if hasattr(layer, 'bw_weights'):
+
+                # logging.info("Setting B = W.T)")
+                # layer.bw_weights = layer.weights.detach().clone().T
+
                 if hasattr(layer, 'weights'):
                     W = layer.weights.detach().cpu().numpy()
                 if hasattr(layer, 'weights_flat'):
                     # for conv layers
                     W = layer.weights_flat.T.detach().cpu().numpy()
                 B = layer.bw_weights.detach().cpu().numpy()
-                deg_WTB.append(deg(cos_sim(W.T, B)))
+                deg_WTB.append(deg(np.round(cos_sim(W.T, B), 4)))
                 logging.info(f'Angle in layer {layer}: {deg_WTB[-1]}')
                 logging.info(f'Size of W: {float("{:.3f}".format(W.mean()))} +- {float("{:.3f}".format(W.std()))}, max {float("{:.3f}".format(W.max()))}')
                 logging.info(f'Size of B: {float("{:.3f}".format(B.mean()))} +- {float("{:.3f}".format(B.std()))}, max {float("{:.3f}".format(B.max()))}')
