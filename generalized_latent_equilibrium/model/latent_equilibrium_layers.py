@@ -123,7 +123,7 @@ class Conv2d(object):
         self.basal_inputs = self.weights_flat @ self.rho_flat
         self.basal_inputs = self.basal_inputs.reshape(self.batch_size, self.num_filters, self.target_size, self.target_size) + self.biases.reshape(1, -1, 1, 1)
 
-        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + self.errors + self.wn_sigma * torch.randn(self.voltages.size(), device=self.device))
+        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + 0.0 * self.errors + self.wn_sigma * torch.randn(self.voltages.size(), device=self.device))
         self.voltage_lookaheads = self.voltages + self.tau * self.voltages_deriv
         self.voltages = self.voltages + self.dt * self.voltages_deriv
 
@@ -299,7 +299,7 @@ class Conv2d_PAL(Conv2d):
         self.noise = self._update_OU_noise(self.noise)
         self.noise = self.noise.reshape(self.batch_size, self.num_filters, self.target_size, self.target_size)
         # voltage is basal + error + OU-noise + white noise
-        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + self.errors + self.wn_sigma * torch.randn(self.voltages.size(), device=self.device))
+        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + 0.0 * self.errors + self.wn_sigma * torch.randn(self.voltages.size(), device=self.device))
         if not self.disable_OU_noise:
             self.voltages_deriv += 1.0 / self.tau * self.noise
             # print("adding noise", self.noise.mean(), self.voltage_lookaheads.mean())
@@ -677,7 +677,7 @@ class Projection(object):
 
         self.basal_inputs = torch.matmul(rho, self.weights) + self.biases
 
-        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + self.errors)
+        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + 0.0 * self.errors)
         self.voltage_lookaheads = self.voltages + self.tau * self.voltages_deriv
         self.voltages = self.voltages + self.dt * self.voltages_deriv
 
@@ -847,7 +847,7 @@ class Projection_PAL(Projection):
         # calculate new noise
         self.noise = self._update_OU_noise(self.noise)
         # voltage is basal + error + OU-noise + white noise
-        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + self.errors + self.wn_sigma * torch.randn(self.voltages.size(), device=self.device))
+        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + 0.0 * self.errors + self.wn_sigma * torch.randn(self.voltages.size(), device=self.device))
         if not self.disable_OU_noise:
             self.voltages_deriv += 1.0 / self.tau *  self.noise
         self.voltage_lookaheads = self.voltages + self.tau * self.voltages_deriv
@@ -1067,7 +1067,7 @@ class Linear(object):
         self.basal_inputs = torch.matmul(rho, self.weights) + self.biases
 
         # voltages are basal + error + noise
-        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + self.errors + self.wn_sigma * torch.randn(self.voltages.size(), device=self.device))
+        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + 0.0 * self.errors + self.wn_sigma * torch.randn(self.voltages.size(), device=self.device))
         self.voltage_lookaheads = self.voltages + self.tau * self.voltages_deriv
         self.voltages = self.voltages + self.dt * self.voltages_deriv
 
@@ -1240,7 +1240,7 @@ class Linear_PAL(Linear):
         # calculate new noise
         self.noise = self._update_OU_noise(self.noise)
         # voltage is basal + error + OU-noise + white noise
-        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + self.errors + self.wn_sigma * torch.randn(self.voltages.size(), device=self.device))
+        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + 0.0 * self.errors + self.wn_sigma * torch.randn(self.voltages.size(), device=self.device))
         if not self.disable_OU_noise:
             self.voltages_deriv += 1.0 / self.tau * self.noise
         self.voltage_lookaheads = self.voltages + self.tau * self.voltages_deriv
