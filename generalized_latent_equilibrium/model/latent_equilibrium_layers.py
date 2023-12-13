@@ -123,14 +123,15 @@ class Conv2d(object):
         self.basal_inputs = self.weights_flat @ self.rho_flat
         self.basal_inputs = self.basal_inputs.reshape(self.batch_size, self.num_filters, self.target_size, self.target_size) + self.biases.reshape(1, -1, 1, 1)
 
-        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + self.errors + self.wn_sigma * torch.randn(self.voltages.size(), device=self.device))
+        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + 0.0 * self.errors + self.wn_sigma * torch.randn(self.voltages.size(), device=self.device))
         self.voltage_lookaheads = self.voltages + self.tau * self.voltages_deriv
         self.voltages = self.voltages + self.dt * self.voltages_deriv
 
         self.rho = self.act_function(self.voltage_lookaheads)
         self.rho_deriv = self.act_func_deriv(self.voltage_lookaheads)
 
-        self.errors = self._calculate_errors(self.voltage_lookaheads, rho_deriv, self.basal_inputs)
+        # self.errors = self._calculate_errors(self.voltage_lookaheads, rho_deriv, self.basal_inputs)
+        self.errors = self._calculate_errors(self.errors, rho_deriv)
         return self.rho, self.rho_deriv
 
     def update_weights(self, errors, with_optimizer=False):
@@ -190,7 +191,8 @@ class Conv2d(object):
         """
         return self.errors.mean([0, 2, 3])
 
-    def _calculate_errors(self, voltage_lookaheads, rho_deriv, basal_inputs):
+    # def _calculate_errors(self, voltage_lookaheads, rho_deriv, basal_inputs):
+    def _calculate_errors(self, errors, rho_deriv):
         """
         Calculate:
             layerwise error:    e = diag(r') W^T (U - Wr)
@@ -205,7 +207,7 @@ class Conv2d(object):
 
         """
         # e
-        e = (voltage_lookaheads - basal_inputs).reshape(self.batch_size, self.num_filters, -1)
+        e = errors.reshape(self.batch_size, self.num_filters, -1)
         if self.algorithm == 'BP':
             err = self.weights_flat.T @ e
         elif self.algorithm in ['FA', 'DFA']:
@@ -299,7 +301,7 @@ class Conv2d_PAL(Conv2d):
         self.noise = self._update_OU_noise(self.noise)
         self.noise = self.noise.reshape(self.batch_size, self.num_filters, self.target_size, self.target_size)
         # voltage is basal + error + OU-noise + white noise
-        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + self.errors + self.wn_sigma * torch.randn(self.voltages.size(), device=self.device))
+        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + 0.0 * self.errors + self.wn_sigma * torch.randn(self.voltages.size(), device=self.device))
         if not self.disable_OU_noise:
             self.voltages_deriv += 1.0 / self.tau * self.noise
             # print("adding noise", self.noise.mean(), self.voltage_lookaheads.mean())
@@ -318,14 +320,16 @@ class Conv2d_PAL(Conv2d):
         # calculate high-pass of current layer rate, to be passed to layer below
         self.rho_HP = self._calc_HP(Delta_rho=self.Delta_rho)
 
-        self.errors = self._calculate_errors(self.voltage_lookaheads, rho_deriv, self.basal_inputs)
+        # self.errors = self._calculate_errors(self.voltage_lookaheads, rho_deriv, self.basal_inputs)
+        self.errors = self._calculate_errors(self.errors, rho_deriv)
 
         # print("rho_HP in fw:", self.rho_HP.mean())
         # print("noise in fw:", self.noise.mean())
 
         return self.rho, self.rho_deriv, self.rho_HP, self.noise
 
-    def _calculate_errors(self, voltage_lookaheads, rho_deriv, basal_inputs):
+    # def _calculate_errors(self, voltage_lookaheads, rho_deriv, basal_inputs):
+    def _calculate_errors(self, errors, rho_deriv):
         """
         Calculate:
             layerwise error:    e = diag(r') B (U - Wr)
@@ -340,7 +344,8 @@ class Conv2d_PAL(Conv2d):
 
         """
         # e
-        e = (voltage_lookaheads - basal_inputs).reshape(self.batch_size, self.num_filters, -1)
+        # e = (voltage_lookaheads - basal_inputs).reshape(self.batch_size, self.num_filters, -1)
+        e = errors.reshape(self.batch_size, self.num_filters, -1)
         err = self.bw_weights.T @ e
         err = self.fold(err)
         err = rho_deriv * err
@@ -677,14 +682,15 @@ class Projection(object):
 
         self.basal_inputs = torch.matmul(rho, self.weights) + self.biases
 
-        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + self.errors)
+        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + 0.0 * self.errors)
         self.voltage_lookaheads = self.voltages + self.tau * self.voltages_deriv
         self.voltages = self.voltages + self.dt * self.voltages_deriv
 
         self.rho = self.act_function(self.voltage_lookaheads)
         self.rho_deriv = self.act_func_deriv(self.voltage_lookaheads)
 
-        self.errors = self._calculate_errors(self.voltage_lookaheads, rho_deriv, self.basal_inputs)
+        # self.errors = self._calculate_errors(self.voltage_lookaheads, rho_deriv, self.basal_inputs)
+        self.errors = self._calculate_errors(self.errors, rho_deriv)
         return self.rho, self.rho_deriv
 
     def update_weights(self, errors, with_optimizer=False):
@@ -743,7 +749,8 @@ class Projection(object):
         """
         return self.errors.mean(0)
 
-    def _calculate_errors(self, voltage_lookaheads, rho_deriv, basal_inputs):
+    # def _calculate_errors(self, voltage_lookaheads, rho_deriv, basal_inputs):
+    def _calculate_errors(self, errors, rho_deriv):
         """
         Calculate:
             layerwise error:    e = diag(r') W^T (U - Wr)
@@ -759,9 +766,9 @@ class Projection(object):
         """
         # e
         if self.algorithm == 'BP':
-            err = torch.matmul(voltage_lookaheads - basal_inputs, self.weights.t())
+            err = torch.matmul(errors, self.weights.t())
         elif self.algorithm in ['FA', 'DFA']:
-            err = torch.matmul(voltage_lookaheads - basal_inputs, self.bw_weights)
+            err = torch.matmul(errors, self.bw_weights)
         err = err.reshape((len(err), self.C, self.H, self.W))
         err = rho_deriv * err
         return err
@@ -847,7 +854,7 @@ class Projection_PAL(Projection):
         # calculate new noise
         self.noise = self._update_OU_noise(self.noise)
         # voltage is basal + error + OU-noise + white noise
-        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + self.errors + self.wn_sigma * torch.randn(self.voltages.size(), device=self.device))
+        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + 0.0 * self.errors + self.wn_sigma * torch.randn(self.voltages.size(), device=self.device))
         if not self.disable_OU_noise:
             self.voltages_deriv += 1.0 / self.tau *  self.noise
         self.voltage_lookaheads = self.voltages + self.tau * self.voltages_deriv
@@ -865,11 +872,13 @@ class Projection_PAL(Projection):
         # calculate high-pass of current layer rate, to be passed to layer below
         self.rho_HP = self._calc_HP(Delta_rho=self.Delta_rho)
 
-        self.errors = self._calculate_errors(self.voltage_lookaheads, rho_deriv, self.basal_inputs)
+        # self.errors = self._calculate_errors(self.voltage_lookaheads, rho_deriv, self.basal_inputs)
+        self.errors = self._calculate_errors(self.errors, rho_deriv)
 
         return self.rho, self.rho_deriv, self.rho_HP, self.noise
 
-    def _calculate_errors(self, voltage_lookaheads, rho_deriv, basal_inputs):
+    # def _calculate_errors(self, voltage_lookaheads, rho_deriv, basal_inputs):
+    def _calculate_errors(self, errors, rho_deriv):
         """
         Calculate:
             layerwise error:    e = diag(r') B (U - Wr)
@@ -884,7 +893,7 @@ class Projection_PAL(Projection):
 
         """
         # e
-        err = torch.matmul(voltage_lookaheads - basal_inputs, self.bw_weights)
+        err = torch.matmul(errors, self.bw_weights)
         err = err.reshape((len(err), self.C, self.H, self.W))
         err = rho_deriv * err
         return err
@@ -1067,14 +1076,15 @@ class Linear(object):
         self.basal_inputs = torch.matmul(rho, self.weights) + self.biases
 
         # voltages are basal + error + noise
-        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + self.errors + self.wn_sigma * torch.randn(self.voltages.size(), device=self.device))
+        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + 0.0 * self.errors + self.wn_sigma * torch.randn(self.voltages.size(), device=self.device))
         self.voltage_lookaheads = self.voltages + self.tau * self.voltages_deriv
         self.voltages = self.voltages + self.dt * self.voltages_deriv
 
         self.rho = self.act_function(self.voltage_lookaheads)
         self.rho_deriv = self.act_func_deriv(self.voltage_lookaheads)
 
-        self.errors = self._calculate_errors(self.voltage_lookaheads, rho_deriv, self.basal_inputs)
+        # self.errors = self._calculate_errors(self.voltage_lookaheads, rho_deriv, self.basal_inputs)
+        self.errors = self._calculate_errors(self.errors, rho_deriv)
         return self.rho, self.rho_deriv
 
     def update_weights(self, errors, with_optimizer=False):
@@ -1135,7 +1145,7 @@ class Linear(object):
         """
         return self.errors.mean(0)
 
-    def _calculate_errors(self, voltage_lookaheads, rho_deriv, basal_inputs):
+    def _calculate_errors(self, errors, rho_deriv):
         """
         Calculate:
             layerwise error:    e = diag(r') W^T (U - Wr)
@@ -1151,9 +1161,9 @@ class Linear(object):
         """
         # e
         if self.algorithm == 'BP':
-            err = rho_deriv * torch.matmul(voltage_lookaheads - basal_inputs, self.weights.t())
+            err = rho_deriv * torch.matmul(errors, self.weights.t())
         elif self.algorithm in ['FA', 'DFA']:
-            err = rho_deriv * torch.matmul(voltage_lookaheads - basal_inputs, self.bw_weights)
+            err = rho_deriv * torch.matmul(errors, self.bw_weights)
 
         return err
 
@@ -1240,7 +1250,7 @@ class Linear_PAL(Linear):
         # calculate new noise
         self.noise = self._update_OU_noise(self.noise)
         # voltage is basal + error + OU-noise + white noise
-        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + self.errors + self.wn_sigma * torch.randn(self.voltages.size(), device=self.device))
+        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + 0.0 * self.errors + self.wn_sigma * torch.randn(self.voltages.size(), device=self.device))
         if not self.disable_OU_noise:
             self.voltages_deriv += 1.0 / self.tau * self.noise
         self.voltage_lookaheads = self.voltages + self.tau * self.voltages_deriv
