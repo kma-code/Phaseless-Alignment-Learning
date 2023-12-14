@@ -456,7 +456,7 @@ class Conv2d_PAL(Conv2d):
 
 class MaxPool2d(object):
     # These are not really neurons...
-    def __init__(self, kernel_size, dtype=torch.float32, algorithm='BP'):
+    def __init__(self, kernel_size, dtype=torch.float32, algorithm='BP', tau_xi=1.0, sigma=1e-2):
         self.kernel_size = kernel_size
         self.target_size = kernel_size
         self.algorithm = algorithm
@@ -475,9 +475,15 @@ class MaxPool2d(object):
         self.rho_input = None
         self.rho_deriv = torch.zeros([1, self.target_size], dtype=dtype, device=self.device)
         if self.algorithm == 'PAL':
-            self.noise = torch.zeros([1, self.target_size], device=self.device)
+            self.noise = None
             self.rho_HP = torch.zeros([1, self.target_size], device=self.device)
             self.Delta_rho = torch.zeros([1, self.target_size], device=self.device)
+
+
+            self.disable_OU_noise = False
+
+            self.tau_xi = tau_xi    # time constant of OU noise
+            self.sigma = sigma      # scale of injected noise
 
 
     def train(self):
@@ -511,7 +517,7 @@ class MaxPool2d(object):
             self.errors = torch.repeat_interleave(self.errors, repetition_vector, dim=0).clone()
             self.voltage_lookaheads = torch.repeat_interleave(self.voltage_lookaheads, repetition_vector, dim=0).clone()
 
-            if self.algorithm == 'PAL':
+            if self.algorithm == 'PAL':                
                 self.noise = torch.repeat_interleave(self.noise, repetition_vector, dim=0).clone()
                 self.rho_HP = torch.repeat_interleave(self.rho_HP, repetition_vector, dim=0).clone()
                 self.Delta_rho = torch.repeat_interleave(self.Delta_rho, repetition_vector, dim=0).clone()
@@ -522,14 +528,26 @@ class MaxPool2d(object):
 
         self._adapt_parallel_network_qty()
 
-        rho_out, self.idxs_rho = F.max_pool2d(rho, self.kernel_size, return_indices=True)
+        self.rho, self.idxs_rho = F.max_pool2d(rho, self.kernel_size, return_indices=True)
         rho_deriv_out = self._maxpool2d_with_indices(rho_deriv, self.idxs_rho)
 
-        # noise is taken from layer below
-        if noise is not None:
-            noise_out = self._maxpool2d_with_indices(noise, self.idxs_rho)
+        if self.algorithm == 'PAL' and self.noise is None:
+            self.noise = torch.zeros_like(self.rho)
+
+        if self.algorithm == 'PAL':
+            # # take noise from layer below
+            # noise_out = self._maxpool2d_with_indices(noise, self.idxs_rho)
+            # calculate new noise
+            self.noise = self._update_OU_noise(self.noise)
+            # add to rho to send to next layer
+            if not self.disable_OU_noise:
+                self.rho += self.noise
+            # send noise output for learning of B
+            noise_out = self.noise
         # rho_HP is not needed for learning in our case
         rho_HP_out = None
+
+        rho_out = self.rho
 
         if self.algorithm in ['BP', 'FA', 'DFA']:
             return rho_out, rho_deriv_out
@@ -560,6 +578,33 @@ class MaxPool2d(object):
 
     def update_parameters(self, new_params):
         pass
+
+    def _update_OU_noise(self, noise):
+        """
+        Calculate:
+            layerwise noise:    xi[t] = xi[t-dt] + 1/tau_xi (\\sqrt(tau_xi dt) \\sigma_\\ell w - dt xi[t-dt])
+
+        Args:
+            noise: xi[t-dt]
+
+        Returns:
+            noise: xi[t]
+
+        """
+
+        # sample new noise and low-pass filter
+        temp_noise = torch.empty(noise.size(), device=self.device).normal_(mean=0.0, std=1.0)
+        noise += 1/self.tau_xi * (np.sqrt(self.tau_xi * self.dt) * self.sigma * temp_noise - self.dt * noise)
+        # noise += 1/self.tau_xi * (np.sqrt(self.tau_xi * self.dt) * self.sigma * torch.randn(noise.size(), device=self.device) - self.dt * noise)
+
+        return noise
+
+    def get_PAL_parameters(self):
+        param_dict = {
+                "tau_xi": self.tau_xi,
+                "sigma": self.sigma}
+        return param_dict
+
 
 
 class AvgPool2d(object):
