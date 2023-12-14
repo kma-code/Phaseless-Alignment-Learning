@@ -517,8 +517,9 @@ class MaxPool2d(object):
             self.errors = torch.repeat_interleave(self.errors, repetition_vector, dim=0).clone()
             self.voltage_lookaheads = torch.repeat_interleave(self.voltage_lookaheads, repetition_vector, dim=0).clone()
 
-            if self.algorithm == 'PAL':                
-                self.noise = torch.repeat_interleave(self.noise, repetition_vector, dim=0).clone()
+            if self.algorithm == 'PAL':
+                if self.noise is not None:
+                    self.noise = torch.repeat_interleave(self.noise, repetition_vector, dim=0).clone()
                 self.rho_HP = torch.repeat_interleave(self.rho_HP, repetition_vector, dim=0).clone()
                 self.Delta_rho = torch.repeat_interleave(self.Delta_rho, repetition_vector, dim=0).clone()
 
