@@ -537,14 +537,14 @@ class MaxPool2d(object):
 
         if self.algorithm == 'PAL':
             # # take noise from layer below
-            # noise_out = self._maxpool2d_with_indices(noise, self.idxs_rho)
+            noise_out = self._maxpool2d_with_indices(noise, self.idxs_rho)
             # calculate new noise
             self.noise = self._update_OU_noise(self.noise)
             # add to rho to send to next layer
             if not self.disable_OU_noise:
                 self.rho += self.noise
             # send noise output for learning of B
-            noise_out = self.noise
+            noise_out += self.noise
         # rho_HP is not needed for learning in our case
         rho_HP_out = None
 
