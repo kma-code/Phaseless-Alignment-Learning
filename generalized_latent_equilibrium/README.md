@@ -33,16 +33,35 @@ Important: Run the single experiment before in order to download MNIST dataset.
 Then, use the simple runner script (modify parameters for sweep in `runner.py`):
 
 ```
-cd experiments/Fig5
+cd experiments/MNIST_AUTOENCODER/Fig5
 python runner.py --algorithm PAL --run
 python runner.py --algorithm PAL --linclass
 python runner.py --algorithm PAL --gather
 ```
 
-Instead of PAL algorithm, choose from `BP, FA or PAL`.
+Instead of PAL algorithm, choose from `BP, FA, DFA or PAL`.
 
 - `--run` Will train the model, saving latent activation and model after every epoch.
 - `--linclass` Will load the model files and run a linear classifier on the test set.
 - `--gather` Will gather all results into a .npy file. Run linclass.ipynb to produce Fig. 5. 
 
 These runs will altogether take about 2h on a high-end GPU (tested on Tesla P100).
+
+## Instructions for reproducing CIFAR-10 experiment with PAL
+
+This will run the experiment required for Tab. 1 in the manuscript. See paper and supplementary information for network parameters.
+
+Use the simple runner script (modify parameters for sweep in `runner.py`):
+
+```
+cd experiments/CIFAR10/Tab1
+python runner.py --algorithm PAL --run
+python runner.py --algorithm PAL --gather
+```
+
+Instead of PAL algorithm, choose from `BP, FA, DFA or PAL`.
+
+- `--run` Will train the model, saving latent activation and model after every epoch.
+- `--gather` Will gather all validation accuracies into a .npy file. Detailed results are saved in subfolders for each model.
+
+These runs will altogether take about 10h on a high-end GPU (tested on Tesla P100).
