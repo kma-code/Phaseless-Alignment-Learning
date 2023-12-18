@@ -155,7 +155,7 @@ if __name__ == '__main__':
 				lin_acc_arr.append(lin_acc_per_lr)
 
 
-		lin_acc_output_file = PATH_runner / "lin_acc_lr_seeds_epochs.npy"
+		lin_acc_output_file = PATH_runner / "acc_lr_seeds_epochs.npy"
 		np.save(lin_acc_output_file, lin_acc_arr)
 		logging.info(f"Gathered data and saved to {lin_acc_output_file}.")
 
