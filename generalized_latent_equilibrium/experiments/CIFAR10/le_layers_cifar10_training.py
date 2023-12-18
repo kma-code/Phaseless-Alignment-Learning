@@ -174,9 +174,6 @@ def validate_model(model, val_loader):
 
         for update_i in range(presentation_steps):
             model.update(x, target)
-            if False: #rec_prosp_u:
-                for i, layer in enumerate(model.layers):
-                    voltage_lookaheads_arr[i] += [layer.voltage_lookaheads.detach().cpu().numpy().mean(), layer.voltage_lookaheads.detach().cpu().numpy().std()]
 
         out = model.rho[-1]
 
@@ -193,22 +190,11 @@ def validate_model(model, val_loader):
             else:
                 logging.info(f'Epoch: {model.epoch}, batch index: {batch_idx + 1}, val acc:  {correct_cnt/total_cnt:.9f}')
 
-    # # record weights
-    # weights_arr = [layer.weights.detach().cpu().numpy() for layer in model.layers] if rec_weights else None
-    # if model.algorithm in ["FA", "PAL"]:
-    #     bw_weights_arr = [layer.bw_weights.detach().cpu().numpy() for layer in model.layers] if rec_weights else None
-    # elif model.algorithm == 'BP':
-    #     bw_weights_arr = [layer.weights.t().detach().cpu().numpy() for layer in model.layers] if rec_weights else None
-
     # record angle between weights
     if model.algorithm in ["FA", "PAL"] and rec_degs:
         deg_WTB = []
         for layer in model.layers:
             if hasattr(layer, 'bw_weights'):
-
-                #if model.epoch == 100:
-                #    logging.info("Setting B = W.T")
-                #    layer.bw_weights = layer.weights.detach().clone().T
 
                 if hasattr(layer, 'weights'):
                     W = layer.weights.detach().cpu().numpy()
@@ -446,8 +432,6 @@ if __name__ == '__main__':
     with_optimizer = False
 
     logging.info(f"Params: Epochs {epochs}, batch_size {batch_size}, lr_multiplier {lr_multiplier}, lr_factors {lr_factors}, white noise {wn_sigma}, algorithm {algorithm}, target_type {target_type}")
-    # if algorithm == "PAL":
-    #     logging.info(f"Params: bw_lr_factors {bw_lr_factors}, regularizer {regularizer}, tau_xi {tau_xi}, tau_HP {tau_HP}, tau_LO {tau_LO}, sigma {sigma}")
 
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
@@ -577,9 +561,6 @@ if __name__ == '__main__':
                 model = LeNet5(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer, wn_sigma=wn_sigma, activation = activation)
         model.epoch = 0
 
-    # optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
-
-    # criterion = nn.CrossEntropyLoss()
 
     model.val_acc = []
     model.deg_arr = []
@@ -588,11 +569,6 @@ if __name__ == '__main__':
     prosp_u_without_noise_time_series_epochs = []
     prosp_u_with_noise_time_series_epochs = []
 
-    ## save model at init
-    #with open(PATH_OUTPUT + 'MLPNet_epoch0.pkl', 'wb') as output:
-    #            pickle.dump(model, output, pickle.HIGHEST_PROTOCOL)
-    #            logging.info(f'Saved model to {output.name}')
-    # evaluate model on test set
     logging.info("Evaluating model before training (val+test)")
 
     logging.info(f"Target type: {model.target_type}")
@@ -644,8 +620,6 @@ if __name__ == '__main__':
         model.train()
         voltage_lookaheads_train_arr = np.array([[0.0, 0.0] for layer in model.layers])
         for batch_idx, (x, target) in enumerate(tqdm(train_loader, desc="Batches", disable=tqdm_disabled)):
-        # for batch_idx, (x, label) in enumerate(train_loader):
-            # optimizer.zero_grad()
             if use_cuda:
                 x, target = x.cuda(), target.cuda()
             if network_type == 'MLPNet':
@@ -653,9 +627,6 @@ if __name__ == '__main__':
 
             for update_i in range(presentation_steps):
                 model.update(x, target)
-                if False: #rec_prosp_u:
-                    for i, layer in enumerate(model.layers):
-                        voltage_lookaheads_train_arr[i] += [layer.voltage_lookaheads.detach().cpu().numpy().mean(), layer.voltage_lookaheads.detach().cpu().numpy().std()]
 
             loss = model.errors[-1]
             out = model.rho[-1]
@@ -663,17 +634,10 @@ if __name__ == '__main__':
             total_cnt += x.shape[0]
             correct_cnt += (pred_label == torch.max(target, 1)[1]).sum()
             summed_loss += loss.detach().cpu().numpy()
-            # loss.backward()
-            # optimizer.step()
             if (batch_idx + 1) % 100 == 0 or (batch_idx + 1) == len(train_loader):
                 logging.info(f'Epoch: {epoch+1}, batch index: {batch_idx + 1}, train loss: {(np.abs(summed_loss).sum(1)/total_cnt).mean(0):.9f}, train acc:  {correct_cnt/total_cnt:.9f}')
         
         train_accuracies.append((correct_cnt / total_cnt).cpu().numpy())
-        
-        if False: #rec_prosp_u:
-            voltage_lookaheads_train_arr = voltage_lookaheads_train_arr / presentation_steps / (batch_idx + 1)
-            logging.info(f"train u_prosp mean, std: \n {voltage_lookaheads_train_arr}")
-            voltage_lookaheads_train_arr_all_epochs.append(voltage_lookaheads_train_arr)
         
         # validate
         val, deg_WTB, voltage_lookaheads_val_arr = validate_model(model, val_loader)
