@@ -22,7 +22,7 @@ Restart shell and activate environment again.
 ## Instructions for running a single MNIST autoencoder experiment with PAL
 
 Run MNIST autoencoder experiment:
-`python experiments/le_layers_mnist_training.py --params experiments/single_example/params.json`
+`python experiments/MNIST_AUTOENCODER/le_layers_mnist_training.py --params experiments/MNIST_AUTOENCODER/single_example/params.json`
 
 ## Instructions for reproducing MNIST autoencoder experiment with PAL (parameter sweep and linear classifier)
 
