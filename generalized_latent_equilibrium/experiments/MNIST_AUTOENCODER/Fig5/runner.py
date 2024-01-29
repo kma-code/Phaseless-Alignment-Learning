@@ -35,8 +35,7 @@ if __name__ == '__main__':
 
 
 
-	#OUTPUT_DIR = PATH_runner / "runs"
-	OUTPUT_DIR = Path("/users/kmax/scratch/generalized_latent_equilibrium/runs")
+	OUTPUT_DIR = PATH_runner / "runs"
 
 	# create a bunch of JSON param files in subfolders (lr/seeds/)
 	seeds = [1,3,5,7,9,11,13,15,17,19]
