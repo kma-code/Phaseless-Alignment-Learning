@@ -26,7 +26,7 @@ def dataloader_seed_worker(worker_id):
 
 
 class Conv2d(object):
-    def __init__(self, num_channels, num_filters, kernel_size, batch_size, input_size, act_function, padding=0, stride=1, learning_rate=0.1, algorithm='BP', wn_sigma=0, tau_LO=None):
+    def __init__(self, num_channels, num_filters, kernel_size, batch_size, input_size, act_function, padding=0, stride=1, learning_rate=0.1, algorithm='BP', wn_sigma=0, tau_LO=None, gamma=0.0):
         self.input_size = input_size
         self.num_channels = num_channels
         self.num_filters = num_filters
@@ -35,6 +35,8 @@ class Conv2d(object):
         self.padding = padding
         self.stride = stride
         self.target_size = (np.floor((self.input_size + (2 * self.padding) - self.kernel_size) / self.stride) + 1).astype(int)
+
+        self.gamma = gamma
 
         self.tau = 10.0
         self.dt = 0.1
@@ -123,7 +125,7 @@ class Conv2d(object):
         self.basal_inputs = self.weights_flat @ self.rho_flat
         self.basal_inputs = self.basal_inputs.reshape(self.batch_size, self.num_filters, self.target_size, self.target_size) + self.biases.reshape(1, -1, 1, 1)
 
-        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + 0.0 * self.errors + self.wn_sigma * torch.randn(self.voltages.size(), device=self.device))
+        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + self.gamma * self.errors + self.wn_sigma * torch.randn(self.voltages.size(), device=self.device))
         self.voltage_lookaheads = self.voltages + self.tau * self.voltages_deriv
         self.voltages = self.voltages + self.dt * self.voltages_deriv
 
@@ -242,10 +244,10 @@ class Conv2d_PAL(Conv2d):
         and inject noise. 
 
     """
-    def __init__(self, num_channels, num_filters, kernel_size, batch_size, input_size, act_function, padding=0, stride=1, algorithm='PAL', learning_rate=0.1, learning_rate_bw=1.0, regularizer=1e-3, tau_xi=1.0, tau_HP=1.0, tau_LO=1000.0, sigma=1e-2, wn_sigma=0.0):
+    def __init__(self, num_channels, num_filters, kernel_size, batch_size, input_size, act_function, padding=0, stride=1, algorithm='PAL', learning_rate=0.1, learning_rate_bw=1.0, regularizer=1e-3, tau_xi=1.0, tau_HP=1.0, tau_LO=1000.0, sigma=1e-2, wn_sigma=0.0, gamma=0.0):
 
         # init parent class with same settings
-        super().__init__(num_channels=num_channels, num_filters=num_filters, kernel_size=kernel_size, batch_size=batch_size, input_size=input_size, act_function=act_function, padding=padding, stride=stride, learning_rate=learning_rate, algorithm=algorithm, wn_sigma=wn_sigma, tau_LO=tau_LO)
+        super().__init__(num_channels=num_channels, num_filters=num_filters, kernel_size=kernel_size, batch_size=batch_size, input_size=input_size, act_function=act_function, padding=padding, stride=stride, learning_rate=learning_rate, algorithm=algorithm, wn_sigma=wn_sigma, tau_LO=tau_LO, gamma=gamma)
 
 
         if self.algorithm != 'PAL':
@@ -301,7 +303,7 @@ class Conv2d_PAL(Conv2d):
         self.noise = self._update_OU_noise(self.noise)
         self.noise = self.noise.reshape(self.batch_size, self.num_filters, self.target_size, self.target_size)
         # voltage is basal + error + OU-noise + white noise
-        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + 0.0 * self.errors + self.wn_sigma * torch.randn(self.voltages.size(), device=self.device))
+        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + self.gamma * self.errors + self.wn_sigma * torch.randn(self.voltages.size(), device=self.device))
         if not self.disable_OU_noise:
             self.voltages_deriv += 1.0 / self.tau * self.noise
             # print("adding noise", self.noise.mean(), self.voltage_lookaheads.mean())
@@ -450,7 +452,8 @@ class Conv2d_PAL(Conv2d):
                 "tau_HP": self.tau_HP,
                 "tau_LO": self.tau_LO,
                 "sigma": self.sigma,
-                "wn_sigma": self.wn_sigma}
+                "wn_sigma": self.wn_sigma,
+                "gamma": self.gamma}
         return param_dict
 
 
@@ -648,13 +651,15 @@ class AvgPool2d(object):
 
 
 class Projection(object):
-    def __init__(self, input_size, target_size, act_function, dtype=torch.float32, algorithm='BP', tau_LO=None):
+    def __init__(self, input_size, target_size, act_function, dtype=torch.float32, algorithm='BP', tau_LO=None, gamma=0.0):
         self.input_size = input_size
         self.B, self.C, self.H, self.W = self.input_size
         self.batch_size = self.B
         self.target_size = target_size
         self.act_function = act_function.f
         self.act_func_deriv = act_function.df
+
+        self.gamma = gamma
 
         self.tau = 10.0
         self.dt = 0.1
@@ -728,7 +733,7 @@ class Projection(object):
 
         self.basal_inputs = torch.matmul(rho, self.weights) + self.biases
 
-        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + 0.0 * self.errors)
+        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + self.gamma * self.errors)
         self.voltage_lookaheads = self.voltages + self.tau * self.voltages_deriv
         self.voltages = self.voltages + self.dt * self.voltages_deriv
 
@@ -846,10 +851,10 @@ class Projection_PAL(Projection):
         and inject noise. 
 
     """
-    def __init__(self, input_size, target_size, act_function, algorithm='PAL', dtype=torch.float32, learning_rate=0.1, learning_rate_bw=1.0, regularizer=1e-3, tau_xi=1.0, tau_HP=1.0, tau_LO=1000.0, sigma=1e-2, wn_sigma=0.0):
+    def __init__(self, input_size, target_size, act_function, algorithm='PAL', dtype=torch.float32, learning_rate=0.1, learning_rate_bw=1.0, regularizer=1e-3, tau_xi=1.0, tau_HP=1.0, tau_LO=1000.0, sigma=1e-2, wn_sigma=0.0, gamma=0.0):
 
         # init parent class with same settings
-        super().__init__(input_size=input_size, target_size=target_size, act_function=act_function, algorithm=algorithm, dtype=torch.float32, tau_LO=tau_LO)
+        super().__init__(input_size=input_size, target_size=target_size, act_function=act_function, algorithm=algorithm, dtype=torch.float32, tau_LO=tau_LO, gamma=gamma)
 
 
         if self.algorithm != 'PAL':
@@ -900,7 +905,7 @@ class Projection_PAL(Projection):
         # calculate new noise
         self.noise = self._update_OU_noise(self.noise)
         # voltage is basal + error + OU-noise + white noise
-        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + 0.0 * self.errors + self.wn_sigma * torch.randn(self.voltages.size(), device=self.device))
+        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + self.gamma * self.errors + self.wn_sigma * torch.randn(self.voltages.size(), device=self.device))
         if not self.disable_OU_noise:
             self.voltages_deriv += 1.0 / self.tau *  self.noise
         self.voltage_lookaheads = self.voltages + self.tau * self.voltages_deriv
@@ -1038,16 +1043,19 @@ class Projection_PAL(Projection):
                 "tau_HP": self.tau_HP,
                 "tau_LO": self.tau_LO,
                 "sigma": self.sigma,
-                "wn_sigma": self.wn_sigma}
+                "wn_sigma": self.wn_sigma,
+                "gamma": self.gamma}
         return param_dict
 
 
 class Linear(object):
-    def __init__(self, input_size, target_size, act_function, algorithm='BP', dtype=torch.float32, learning_rate=0.1, wn_sigma=0, tau_LO=None):
+    def __init__(self, input_size, target_size, act_function, algorithm='BP', dtype=torch.float32, learning_rate=0.1, wn_sigma=0, tau_LO=None, gamma=0.0):
         self.input_size = input_size
         self.target_size = target_size
         self.act_function = act_function.f
         self.act_func_deriv = act_function.df
+
+        self.gamma = gamma
 
         self.tau = 10.0
         self.dt = 0.1
@@ -1122,7 +1130,7 @@ class Linear(object):
         self.basal_inputs = torch.matmul(rho, self.weights) + self.biases
 
         # voltages are basal + error + noise
-        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + 0.0 * self.errors + self.wn_sigma * torch.randn(self.voltages.size(), device=self.device))
+        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + self.gamma * self.errors + self.wn_sigma * torch.randn(self.voltages.size(), device=self.device))
         self.voltage_lookaheads = self.voltages + self.tau * self.voltages_deriv
         self.voltages = self.voltages + self.dt * self.voltages_deriv
 
@@ -1243,10 +1251,10 @@ class Linear_PAL(Linear):
         and inject noise. 
 
     """
-    def __init__(self, input_size, target_size, act_function, algorithm='PAL', dtype=torch.float32, learning_rate=0.1, learning_rate_bw=1.0, regularizer=1e-3, tau_xi=1.0, tau_HP=1.0, tau_LO=1000.0, sigma=1e-2, wn_sigma=0.0):
+    def __init__(self, input_size, target_size, act_function, algorithm='PAL', dtype=torch.float32, learning_rate=0.1, learning_rate_bw=1.0, regularizer=1e-3, tau_xi=1.0, tau_HP=1.0, tau_LO=1000.0, sigma=1e-2, wn_sigma=0.0, gamma=0.0):
 
         # init parent class with same settings
-        super().__init__(input_size=input_size, target_size=target_size, act_function=act_function, algorithm=algorithm, dtype=torch.float32, learning_rate=learning_rate, wn_sigma=wn_sigma, tau_LO=tau_LO)
+        super().__init__(input_size=input_size, target_size=target_size, act_function=act_function, algorithm=algorithm, dtype=torch.float32, learning_rate=learning_rate, wn_sigma=wn_sigma, tau_LO=tau_LO, gamma=gamma)
 
 
         if self.algorithm != 'PAL':
@@ -1296,7 +1304,7 @@ class Linear_PAL(Linear):
         # calculate new noise
         self.noise = self._update_OU_noise(self.noise)
         # voltage is basal + error + OU-noise + white noise
-        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + 0.0 * self.errors + self.wn_sigma * torch.randn(self.voltages.size(), device=self.device))
+        self.voltages_deriv = 1.0 / self.tau * (self.basal_inputs - self.voltages + self.gamma * self.errors + self.wn_sigma * torch.randn(self.voltages.size(), device=self.device))
         if not self.disable_OU_noise:
             self.voltages_deriv += 1.0 / self.tau * self.noise
         self.voltage_lookaheads = self.voltages + self.tau * self.voltages_deriv
@@ -1430,7 +1438,8 @@ class Linear_PAL(Linear):
                 "tau_HP": self.tau_HP,
                 "tau_LO": self.tau_LO,
                 "sigma": self.sigma,
-                "wn_sigma": self.wn_sigma}
+                "wn_sigma": self.wn_sigma,
+                "gamma": self.gamma}
         return param_dict
 
 class LESequential(object):

@@ -64,7 +64,7 @@ def deg(cos):
 
 def LeNet5(batch_size, lr_multiplier, lr_factors, tau=10.0, dt=0.1, beta=0.1, algorithm='BP',
            model_variant=ModelVariant.VANILLA, target_type=TargetType.RATE, presentation_steps=10, with_optimizer=False,
-           bw_lr_factors=None, regularizer=None, tau_xi=None, tau_HP=None, tau_LO=None, sigma=None, wn_sigma=[0,0,0,0], activation="TanH"):
+           bw_lr_factors=None, regularizer=None, tau_xi=None, tau_HP=None, tau_LO=None, sigma=None, wn_sigma=[0,0,0,0], activation="TanH", gamma=0.0):
     """
     - 2 Convs with max pooling and relu
     - 2 Fully connected layers and relu
@@ -84,11 +84,11 @@ def LeNet5(batch_size, lr_multiplier, lr_factors, tau=10.0, dt=0.1, beta=0.1, al
     logging.info(f'Initializing LeNet5 net with activation function {act_func}')
 
     if algorithm == 'PAL':
-        l1 = nn.Conv2d_PAL(3, 20, 5, batch_size, 32, act_func, algorithm=algorithm)
+        l1 = nn.Conv2d_PAL(3, 20, 5, batch_size, 32, act_func, algorithm=algorithm, gamma=gamma)
         l2 = nn.MaxPool2d(2, algorithm=algorithm)
-        l3 = nn.Conv2d_PAL(20, 50, 5, batch_size, 14, act_func, algorithm=algorithm)
+        l3 = nn.Conv2d_PAL(20, 50, 5, batch_size, 14, act_func, algorithm=algorithm, gamma=gamma)
         l4 = nn.MaxPool2d(2, algorithm=algorithm)
-        l5 = nn.Projection_PAL((batch_size, 50, 5, 5), 500, act_func, algorithm=algorithm)
+        l5 = nn.Projection_PAL((batch_size, 50, 5, 5), 500, act_func, algorithm=algorithm, gamma=gamma)
         l6 = nn.Linear_PAL(500, 10, tu.Linear, algorithm=algorithm)
 
         network = nn.LESequential([l1, l2, l3, l4, l5, l6], learning_rate, lr_factors, None, None,
@@ -99,12 +99,12 @@ def LeNet5(batch_size, lr_multiplier, lr_factors, tau=10.0, dt=0.1, beta=0.1, al
                 logging.info(f"Initialized {layer} with PAL parameters {layer.get_PAL_parameters()}")
 
     else:
-        l1 = nn.Conv2d(3, 20, 5, batch_size, 32, act_func, algorithm=algorithm)
+        l1 = nn.Conv2d(3, 20, 5, batch_size, 32, act_func, algorithm=algorithm, gamma=gamma)
         l2 = nn.MaxPool2d(2, algorithm=algorithm)
-        l3 = nn.Conv2d(20, 50, 5, batch_size, 14, act_func, algorithm=algorithm)
+        l3 = nn.Conv2d(20, 50, 5, batch_size, 14, act_func, algorithm=algorithm, gamma=gamma)
         l4 = nn.MaxPool2d(2, algorithm=algorithm)
-        l5 = nn.Projection((batch_size, 50, 5, 5), 500, act_func, algorithm=algorithm)
-        l6 = nn.Linear(500, 10, tu.Linear, algorithm=algorithm)
+        l5 = nn.Projection((batch_size, 50, 5, 5), 500, act_func, algorithm=algorithm, gamma=gamma)
+        l6 = nn.Linear(500, 10, tu.Linear, algorithm=algorithm, gamma=gamma)
 
         network = nn.LESequential([l1, l2, l3, l4, l5, l6], learning_rate, lr_factors, None, None,
                                   tau, dt, beta, model_variant, target_type, with_optimizer=with_optimizer, algorithm=algorithm, sigma=sigma, wn_sigma=wn_sigma)
@@ -113,7 +113,7 @@ def LeNet5(batch_size, lr_multiplier, lr_factors, tau=10.0, dt=0.1, beta=0.1, al
 
 def MLPNet(batch_size, lr_multiplier, lr_factors, tau=10.0, dt=0.1, beta=0.1, algorithm='BP',
            model_variant=ModelVariant.VANILLA, target_type=TargetType.RATE, presentation_steps=10, with_optimizer=False,
-           bw_lr_factors=None, regularizer=None, tau_xi=None, tau_HP=None, tau_LO=None, sigma=None, wn_sigma=[0,0,0,0], activation="TanH"):
+           bw_lr_factors=None, regularizer=None, tau_xi=None, tau_HP=None, tau_LO=None, sigma=None, wn_sigma=[0,0,0,0], activation="TanH", gamma=0.0):
     """
     4 layer fully connected network
     """
@@ -135,10 +135,10 @@ def MLPNet(batch_size, lr_multiplier, lr_factors, tau=10.0, dt=0.1, beta=0.1, al
     logging.info(f"Initializing network using {algorithm}")
 
     if algorithm == 'PAL':
-        fc1 = nn.Linear_PAL(32 * 32 * 3, 4000, act_func, algorithm=algorithm)
-        fc2 = nn.Linear_PAL(4000, 1000, act_func, algorithm=algorithm)
-        fc3 = nn.Linear_PAL(1000, 4000, act_func, algorithm=algorithm)
-        fc4 = nn.Linear_PAL(4000, 10, tu.Linear, algorithm=algorithm)
+        fc1 = nn.Linear_PAL(32 * 32 * 3, 4000, act_func, algorithm=algorithm, gamma=gamma)
+        fc2 = nn.Linear_PAL(4000, 1000, act_func, algorithm=algorithm, gamma=gamma)
+        fc3 = nn.Linear_PAL(1000, 4000, act_func, algorithm=algorithm, gamma=gamma)
+        fc4 = nn.Linear_PAL(4000, 10, tu.Linear, algorithm=algorithm, gamma=gamma)
 
         network = nn.LESequential([fc1, fc2, fc3, fc4], learning_rate, lr_factors, None, None,
                                   tau, dt, beta, model_variant, target_type, with_optimizer=with_optimizer, algorithm=algorithm,
@@ -148,10 +148,10 @@ def MLPNet(batch_size, lr_multiplier, lr_factors, tau=10.0, dt=0.1, beta=0.1, al
             logging.info(f"Initialized layer with PAL parameters {layer.get_PAL_parameters()}")
 
     else:
-        fc1 = nn.Linear(32 * 32 * 3, 4000, act_func, algorithm=algorithm)
-        fc2 = nn.Linear(4000, 1000, act_func, algorithm=algorithm)
-        fc3 = nn.Linear(1000, 4000, act_func, algorithm=algorithm)
-        fc4 = nn.Linear(4000, 10, tu.Linear, algorithm=algorithm)
+        fc1 = nn.Linear(32 * 32 * 3, 4000, act_func, algorithm=algorithm, gamma=gamma)
+        fc2 = nn.Linear(4000, 1000, act_func, algorithm=algorithm, gamma=gamma)
+        fc3 = nn.Linear(1000, 4000, act_func, algorithm=algorithm, gamma=gamma)
+        fc4 = nn.Linear(4000, 10, tu.Linear, algorithm=algorithm, gamma=gamma)
         network = nn.LESequential([fc1, fc2, fc3, fc4], learning_rate, lr_factors, None, None,
                                   tau, dt, beta, model_variant, target_type, with_optimizer=with_optimizer, algorithm=algorithm, sigma=sigma, wn_sigma=wn_sigma)
 
@@ -347,6 +347,7 @@ if __name__ == '__main__':
     parser.add_argument('--debug', default=False, action='store_true', help="Disable testing and validation before training")
     # whether to re-init model after loading 
     parser.add_argument('--reload', default=False, action='store_true', help="Re-initialize model with new parameters after loading")
+    parser.add_argument('--gamma', default=0.0, help="Error injection factor")
 
 
     args = parser.parse_args()
@@ -396,6 +397,10 @@ if __name__ == '__main__':
             network_type = PARAMETERS['network_type']
         else:
             network_type = "LeNet5"
+        if "gamma" in PARAMETERS:
+            gamma = PARAMETERS['gamma']
+        else:
+            gamma = 0.0
 
     else:
         PATH_OUTPUT = PATH_SCRIPT + '/output/'
@@ -425,6 +430,7 @@ if __name__ == '__main__':
         rec_noise = args.rec_noise
 
         network_type = args.network_type
+        gamma = args.gamma
     
     DEBUG = args.debug
     RELOAD = args.reload
@@ -526,15 +532,15 @@ if __name__ == '__main__':
             if algorithm == 'PAL':
                 if network_type == 'MLPNet':
                     model = MLPNet(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer,
-                               bw_lr_factors = bw_lr_factors, regularizer = regularizer, tau_xi = tau_xi, tau_HP = tau_HP, tau_LO = tau_LO, sigma = sigma, wn_sigma = wn_sigma, activation = activation)
+                               bw_lr_factors = bw_lr_factors, regularizer = regularizer, tau_xi = tau_xi, tau_HP = tau_HP, tau_LO = tau_LO, sigma = sigma, wn_sigma = wn_sigma, activation = activation, gamma=gamma)
                 elif network_type == 'LeNet5':
                     model = LeNet5(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer,
-                                   bw_lr_factors = bw_lr_factors, regularizer = regularizer, tau_xi = tau_xi, tau_HP = tau_HP, tau_LO = tau_LO, sigma = sigma, wn_sigma = wn_sigma, activation = activation)
+                                   bw_lr_factors = bw_lr_factors, regularizer = regularizer, tau_xi = tau_xi, tau_HP = tau_HP, tau_LO = tau_LO, sigma = sigma, wn_sigma = wn_sigma, activation = activation, gamma=gamma)
             else:
                 if network_type == 'MLPNet':
-                    model = MLPNet(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer, wn_sigma=wn_sigma, activation = activation)
+                    model = MLPNet(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer, wn_sigma=wn_sigma, activation = activation, gamma=gamma)
                 elif network_type == 'LeNet5':
-                    model = LeNet5(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer, wn_sigma=wn_sigma, activation = activation)
+                    model = LeNet5(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer, wn_sigma=wn_sigma, activation = activation, gamma=gamma)
 
             model.epoch = old_model.epoch
             model.update_parameters(old_model.list_parameters())
@@ -550,15 +556,15 @@ if __name__ == '__main__':
         if algorithm == 'PAL':
             if network_type == 'MLPNet':
                 model = MLPNet(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer,
-                               bw_lr_factors = bw_lr_factors, regularizer = regularizer, tau_xi = tau_xi, tau_HP = tau_HP, tau_LO = tau_LO, sigma = sigma, wn_sigma = wn_sigma, activation = activation)
+                               bw_lr_factors = bw_lr_factors, regularizer = regularizer, tau_xi = tau_xi, tau_HP = tau_HP, tau_LO = tau_LO, sigma = sigma, wn_sigma = wn_sigma, activation = activation, gamma=gamma)
             elif network_type == 'LeNet5':
                 model = LeNet5(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer,
-                               bw_lr_factors = bw_lr_factors, regularizer = regularizer, tau_xi = tau_xi, tau_HP = tau_HP, tau_LO = tau_LO, sigma = sigma, wn_sigma = wn_sigma, activation = activation)
+                               bw_lr_factors = bw_lr_factors, regularizer = regularizer, tau_xi = tau_xi, tau_HP = tau_HP, tau_LO = tau_LO, sigma = sigma, wn_sigma = wn_sigma, activation = activation, gamma=gamma)
         else:
             if network_type == 'MLPNet':
-                model = MLPNet(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer, wn_sigma=wn_sigma, activation = activation)
+                model = MLPNet(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer, wn_sigma=wn_sigma, activation = activation, gamma=gamma)
             elif network_type == 'LeNet5':
-                model = LeNet5(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer, wn_sigma=wn_sigma, activation = activation)
+                model = LeNet5(batch_size, lr_multiplier, lr_factors, tau, dt, beta, algorithm, model_variant, target_type, presentation_steps, with_optimizer, wn_sigma=wn_sigma, activation = activation, gamma=gamma)
         model.epoch = 0
 
 
