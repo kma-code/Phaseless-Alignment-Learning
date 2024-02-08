@@ -347,7 +347,7 @@ class Conv2d_PAL(Conv2d):
 
         """
         # e
-        e = (voltage_lookaheads - basal_inputs).reshape(self.batch_size, self.num_filters, -1)
+        e = (voltage_lookaheads - basal_inputs - (1 - self.gamma) * self.noise).reshape(self.batch_size, self.num_filters, -1)
         # e = errors.reshape(self.batch_size, self.num_filters, -1)
         err = self.bw_weights.T @ e
         err = self.fold(err)
@@ -946,7 +946,7 @@ class Projection_PAL(Projection):
 
         """
         # e
-        err = torch.matmul(voltage_lookaheads - basal_inputs, self.bw_weights)
+        err = torch.matmul(voltage_lookaheads - basal_inputs - (1 - self.gamma) * self.noise, self.bw_weights)
         # err = torch.matmul(errors, self.bw_weights)
         err = err.reshape((len(err), self.C, self.H, self.W))
         err = rho_deriv * err
@@ -1332,8 +1332,8 @@ class Linear_PAL(Linear):
 
         return self.rho, self.rho_deriv, self.rho_HP, self.noise
 
-    # def _calculate_errors(self, voltage_lookaheads, rho_deriv, basal_inputs):
-    def _calculate_errors(self, errors, rho_deriv):
+    def _calculate_errors(self, voltage_lookaheads, rho_deriv, basal_inputs):
+    # def _calculate_errors(self, errors, rho_deriv):
         """
         Calculate:
             layerwise error:    e = diag(r') B (U - Wr)
@@ -1348,7 +1348,7 @@ class Linear_PAL(Linear):
 
         """
         # e
-        err = rho_deriv * torch.matmul(voltage_lookaheads - basal_inputs, self.bw_weights)
+        err = rho_deriv * torch.matmul(voltage_lookaheads - basal_inputs - (1 - self.gamma) * self.noise, self.bw_weights)
         # err = rho_deriv * torch.matmul(errors, self.bw_weights)
 
         return err
