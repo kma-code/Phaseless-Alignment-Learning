@@ -132,8 +132,8 @@ class Conv2d(object):
         self.rho = self.act_function(self.voltage_lookaheads)
         self.rho_deriv = self.act_func_deriv(self.voltage_lookaheads)
 
-        # self.errors = self._calculate_errors(self.voltage_lookaheads, rho_deriv, self.basal_inputs)
-        self.errors = self._calculate_errors(self.errors, rho_deriv)
+        self.errors = self._calculate_errors(self.voltage_lookaheads, rho_deriv, self.basal_inputs)
+        # self.errors = self._calculate_errors(self.errors, rho_deriv)
         return self.rho, self.rho_deriv
 
     def update_weights(self, errors, with_optimizer=False):
@@ -193,8 +193,8 @@ class Conv2d(object):
         """
         return self.errors.mean([0, 2, 3])
 
-    # def _calculate_errors(self, voltage_lookaheads, rho_deriv, basal_inputs):
-    def _calculate_errors(self, errors, rho_deriv):
+    def _calculate_errors(self, voltage_lookaheads, rho_deriv, basal_inputs):
+    # def _calculate_errors(self, errors, rho_deriv):
         """
         Calculate:
             layerwise error:    e = diag(r') W^T (U - Wr)
@@ -209,6 +209,7 @@ class Conv2d(object):
 
         """
         # e
+        errors = voltage_lookaheads - basal_inputs
         e = errors.reshape(self.batch_size, self.num_filters, -1)
         if self.algorithm == 'BP':
             err = self.weights_flat.T @ e
@@ -322,16 +323,16 @@ class Conv2d_PAL(Conv2d):
         # calculate high-pass of current layer rate, to be passed to layer below
         self.rho_HP = self._calc_HP(Delta_rho=self.Delta_rho)
 
-        # self.errors = self._calculate_errors(self.voltage_lookaheads, rho_deriv, self.basal_inputs)
-        self.errors = self._calculate_errors(self.errors, rho_deriv)
+        self.errors = self._calculate_errors(self.voltage_lookaheads, rho_deriv, self.basal_inputs)
+        # self.errors = self._calculate_errors(self.errors, rho_deriv)
 
         # print("rho_HP in fw:", self.rho_HP.mean())
         # print("noise in fw:", self.noise.mean())
 
         return self.rho, self.rho_deriv, self.rho_HP, self.noise
 
-    # def _calculate_errors(self, voltage_lookaheads, rho_deriv, basal_inputs):
-    def _calculate_errors(self, errors, rho_deriv):
+    def _calculate_errors(self, voltage_lookaheads, rho_deriv, basal_inputs):
+    # def _calculate_errors(self, errors, rho_deriv):
         """
         Calculate:
             layerwise error:    e = diag(r') B (U - Wr)
@@ -346,8 +347,8 @@ class Conv2d_PAL(Conv2d):
 
         """
         # e
-        # e = (voltage_lookaheads - basal_inputs).reshape(self.batch_size, self.num_filters, -1)
-        e = errors.reshape(self.batch_size, self.num_filters, -1)
+        e = (voltage_lookaheads - basal_inputs).reshape(self.batch_size, self.num_filters, -1)
+        # e = errors.reshape(self.batch_size, self.num_filters, -1)
         err = self.bw_weights.T @ e
         err = self.fold(err)
         err = rho_deriv * err
@@ -740,8 +741,8 @@ class Projection(object):
         self.rho = self.act_function(self.voltage_lookaheads)
         self.rho_deriv = self.act_func_deriv(self.voltage_lookaheads)
 
-        # self.errors = self._calculate_errors(self.voltage_lookaheads, rho_deriv, self.basal_inputs)
-        self.errors = self._calculate_errors(self.errors, rho_deriv)
+        self.errors = self._calculate_errors(self.voltage_lookaheads, rho_deriv, self.basal_inputs)
+        # self.errors = self._calculate_errors(self.errors, rho_deriv)
         return self.rho, self.rho_deriv
 
     def update_weights(self, errors, with_optimizer=False):
@@ -800,8 +801,8 @@ class Projection(object):
         """
         return self.errors.mean(0)
 
-    # def _calculate_errors(self, voltage_lookaheads, rho_deriv, basal_inputs):
-    def _calculate_errors(self, errors, rho_deriv):
+    def _calculate_errors(self, voltage_lookaheads, rho_deriv, basal_inputs):
+    # def _calculate_errors(self, errors, rho_deriv):
         """
         Calculate:
             layerwise error:    e = diag(r') W^T (U - Wr)
@@ -816,6 +817,7 @@ class Projection(object):
 
         """
         # e
+        errors = voltage_lookaheads - basal_inputs
         if self.algorithm == 'BP':
             err = torch.matmul(errors, self.weights.t())
         elif self.algorithm in ['FA', 'DFA']:
@@ -923,13 +925,13 @@ class Projection_PAL(Projection):
         # calculate high-pass of current layer rate, to be passed to layer below
         self.rho_HP = self._calc_HP(Delta_rho=self.Delta_rho)
 
-        # self.errors = self._calculate_errors(self.voltage_lookaheads, rho_deriv, self.basal_inputs)
-        self.errors = self._calculate_errors(self.errors, rho_deriv)
+        self.errors = self._calculate_errors(self.voltage_lookaheads, rho_deriv, self.basal_inputs)
+        # self.errors = self._calculate_errors(self.errors, rho_deriv)
 
         return self.rho, self.rho_deriv, self.rho_HP, self.noise
 
-    # def _calculate_errors(self, voltage_lookaheads, rho_deriv, basal_inputs):
-    def _calculate_errors(self, errors, rho_deriv):
+    def _calculate_errors(self, voltage_lookaheads, rho_deriv, basal_inputs):
+    # def _calculate_errors(self, errors, rho_deriv):
         """
         Calculate:
             layerwise error:    e = diag(r') B (U - Wr)
@@ -944,7 +946,8 @@ class Projection_PAL(Projection):
 
         """
         # e
-        err = torch.matmul(errors, self.bw_weights)
+        err = torch.matmul(voltage_lookaheads - basal_inputs, self.bw_weights)
+        # err = torch.matmul(errors, self.bw_weights)
         err = err.reshape((len(err), self.C, self.H, self.W))
         err = rho_deriv * err
         return err
