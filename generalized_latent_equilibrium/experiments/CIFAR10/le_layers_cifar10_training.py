@@ -219,7 +219,7 @@ def validate_model(model, val_loader):
     else:
         deg_WTB = None
 
-    if False: #rec_prosp_u:
+    if rec_prosp_u:
         voltage_lookaheads_arr = voltage_lookaheads_arr / presentation_steps / (batch_idx + 1)
         logging.info(f"validation u_prosp mean, std: \n {voltage_lookaheads_arr}")
     else:
