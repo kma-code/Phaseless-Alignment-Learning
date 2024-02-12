@@ -500,7 +500,7 @@ if __name__ == '__main__':
                              num_workers=num_workers, pin_memory=True, worker_init_fn=dataloader_seed_worker, drop_last=True)
     if rec_prosp_u:
         comp_set, _ = random_split(val_set, [batch_size, len(val_set)-batch_size], generator=torch.Generator().manual_seed(seed))
-        comp_loader = DataLoader(dataset=comp_set, batch_size=1, shuffle=False,
+        comp_loader = DataLoader(dataset=comp_set, batch_size=batch_size, shuffle=False,
                                 num_workers=num_workers, pin_memory=True, worker_init_fn=dataloader_seed_worker, drop_last=True)
 
     logging.info(f'Total training batches: {len(train_loader)}')
