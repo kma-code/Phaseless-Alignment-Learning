@@ -164,7 +164,7 @@ def validate_model(model, val_loader):
     model.eval()
     model.disable_OU_noise()
 
-    voltage_lookaheads_arr = np.array([[0.0, 0.0] for layer in model.layers])
+    voltage_lookaheads_arr = None
 
     for batch_idx, (x, target) in enumerate(val_loader):
         if use_cuda:
@@ -174,6 +174,11 @@ def validate_model(model, val_loader):
 
         for update_i in range(presentation_steps):
             model.update(x, target)
+            if rec_prosp_u:
+                for i, layer in enumerate(model.layers):
+                    if voltage_lookaheads_arr == None:
+                        voltage_lookaheads_arr = [np.zeros_like(layer.voltage_lookaheads.detach().cpu().numpy()) for layer in model.layers]
+                    voltage_lookaheads_arr[i] += layer.voltage_lookaheads.detach().cpu().numpy()
 
         out = model.rho[-1]
 
